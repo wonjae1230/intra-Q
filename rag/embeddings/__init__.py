@@ -1,4 +1,3 @@
-from .embedder import OpenAITextEmbedder, embed_text, embed_texts
+from .embedder import GeminiTextEmbedder, embed_text, embed_texts
 
-__all__ = ["OpenAITextEmbedder", "embed_text", "embed_texts"]
-
+__all__ = ["GeminiTextEmbedder", "embed_text", "embed_texts"]

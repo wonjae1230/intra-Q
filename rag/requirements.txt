@@ -1,8 +1,6 @@
 langchain
-langchain-openai
+langchain-google-genai
 langchain-community
 langchain-chroma
 chromadb
-openai
 python-dotenv
-

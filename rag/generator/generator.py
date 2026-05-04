@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from rag.config import get_config
 
@@ -17,7 +17,11 @@ class AnswerGenerator:
     def __init__(self, model: str | None = None, temperature: float = 0.0) -> None:
         config = get_config()
         self.model = model or config.chat_model
-        self._client = ChatOpenAI(model=self.model, temperature=temperature)
+        self._client = ChatGoogleGenerativeAI(
+            model=self.model,
+            temperature=temperature,
+            thinking_budget=config.gemini_thinking_budget,
+        )
 
     def generate(self, question: str, chunks: list[Source]) -> dict[str, Any]:
         if not chunks:
@@ -76,4 +80,3 @@ def _dedupe_sources(chunks: list[Source]) -> list[dict[str, Any]]:
 
 def generate_answer(question: str, chunks: list[Source]) -> dict[str, Any]:
     return AnswerGenerator().generate(question, chunks)
-

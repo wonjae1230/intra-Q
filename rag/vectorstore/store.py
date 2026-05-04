@@ -67,7 +67,12 @@ class ChromaVectorStore:
         )
         return ids
 
-    def query_by_embedding(self, embedding: list[float], top_k: int = 4) -> list[SearchResult]:
+    def query_by_embedding(
+        self,
+        embedding: list[float],
+        top_k: int = 4,
+        distance_threshold: float | None = None,
+    ) -> list[SearchResult]:
         raw = self._collection.query(
             query_embeddings=[embedding],
             n_results=top_k,
@@ -90,5 +95,6 @@ class ChromaVectorStore:
                     "distance": distance,
                 }
             )
-        return results
 
+        threshold = get_config().distance_threshold if distance_threshold is None else distance_threshold
+        return [result for result in results if result["distance"] < threshold]

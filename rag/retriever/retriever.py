@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from rag.config import get_config
-from rag.embeddings.embedder import OpenAITextEmbedder
+from rag.embeddings.embedder import GeminiTextEmbedder
 from rag.vectorstore.store import ChromaVectorStore, SearchResult
 
 
 class Retriever:
     def __init__(
         self,
-        embedder: OpenAITextEmbedder | None = None,
+        embedder: GeminiTextEmbedder | None = None,
         store: ChromaVectorStore | None = None,
     ) -> None:
-        self.embedder = embedder or OpenAITextEmbedder()
+        self.embedder = embedder or GeminiTextEmbedder()
         self.store = store or ChromaVectorStore()
 
     def retrieve(self, question: str, top_k: int | None = None) -> list[SearchResult]:
@@ -27,4 +27,3 @@ class Retriever:
 
 def retrieve(question: str, top_k: int | None = None) -> list[SearchResult]:
     return Retriever().retrieve(question, top_k=top_k)
-
