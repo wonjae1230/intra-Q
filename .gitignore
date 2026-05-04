@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+
+rag/.venv/
+rag/chroma_db/
+chroma_db/
+.env
+rag/.env
+
