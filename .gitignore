@@ -9,3 +9,4 @@ chroma_db/
 rag/.env
 *.db
 
+backend/intra_q.db
