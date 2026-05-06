@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const steps = [
   {
@@ -49,6 +49,7 @@ function Illustration() {
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 font-mono text-[9px] font-extrabold text-white">
             AI
           </div>
+
           <span className="font-mono text-[11px] font-bold text-blue-600">
             Q&amp;A Bot
           </span>
@@ -75,27 +76,64 @@ function StepCard({ number, title, description }) {
 }
 
 export default function EmptyStatePage() {
-  const [notice, setNotice] = useState("");
-
-  const handleStartUpload = () => {
-    setNotice("문서 업로드 화면으로 이동할 예정입니다.");
-  };
-
-  const handleTrySample = () => {
-    setNotice("샘플 문서 체험 기능은 이후 연결 예정입니다.");
-  };
+  const navigate = useNavigate();
 
   return (
     <main className="min-h-screen bg-white p-6 font-sans text-slate-950">
-      <div className="mx-auto flex h-[760px] max-w-[1000px] flex-col items-center gap-7 pt-[70px]">
+      <nav className="mb-8 flex h-14 items-center gap-2.5 rounded-[18px] border border-slate-200 bg-white px-4">
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-blue-600 font-mono text-base font-extrabold text-white">
+            Q
+          </span>
+          <span className="text-base font-extrabold">Intra-Q</span>
+        </button>
+
+        <div className="flex-1" />
+
+        <button
+          type="button"
+          onClick={() => navigate("/upload")}
+          className="h-9 rounded-[10px] px-3.5 text-sm font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+        >
+          문서 업로드
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/documents")}
+          className="h-9 rounded-[10px] px-3.5 text-sm font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+        >
+          문서 관리
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/chat")}
+          className="h-9 rounded-[10px] px-3.5 text-sm font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+        >
+          챗봇
+        </button>
+      </nav>
+
+      <div className="mx-auto flex min-h-[calc(100vh-136px)] max-w-[1000px] flex-col items-center justify-center gap-6">
         <Illustration />
 
         <section className="text-center">
-          <h1 className="text-[42px] font-bold tracking-normal">
-            기업 내부 문서 Q&amp;A 봇
+          <h1 className="text-[56px] font-extrabold tracking-tight text-slate-950">
+            Intra-Q
           </h1>
-          <p className="mt-4 text-lg text-slate-500">
-            사내 문서를 업로드하고 AI에게 질문해보세요.
+
+          <p className="mt-2 text-[19px] font-bold text-blue-600">
+            기업 내부 문서 Q&amp;A 봇
+          </p>
+
+          <p className="mx-auto mt-3 max-w-[620px] text-base leading-relaxed text-slate-500">
+            사내 문서를 업로드하고 AI에게 질문해보세요. 아직 연결된 문서가
+            없다면 PDF 업로드부터 시작하면 됩니다.
           </p>
         </section>
 
@@ -108,7 +146,7 @@ export default function EmptyStatePage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={handleStartUpload}
+            onClick={() => navigate("/upload")}
             className="h-[50px] rounded-[14px] bg-blue-600 px-5 text-[15px] font-bold text-white transition hover:bg-blue-700"
           >
             문서 업로드 시작하기
@@ -116,18 +154,12 @@ export default function EmptyStatePage() {
 
           <button
             type="button"
-            onClick={handleTrySample}
+            onClick={() => navigate("/chat")}
             className="h-[50px] rounded-[14px] border border-slate-300 bg-white px-5 text-[15px] font-bold text-slate-700 transition hover:bg-slate-50"
           >
             샘플 문서로 체험하기
           </button>
         </div>
-
-        {notice && (
-          <div className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-600">
-            {notice}
-          </div>
-        )}
       </div>
     </main>
   );

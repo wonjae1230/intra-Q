@@ -1,4 +1,8 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import { pageSources } from "../data/mockData";
+import { AppLayout } from "../components/ui";
 
 const documentInfo = {
   name: "인사규정.pdf",
@@ -6,42 +10,6 @@ const documentInfo = {
   pages: "24페이지",
   chunks: "86청크",
 };
-
-const pageSources = [
-  {
-    page: "17",
-    title: "제6장 근태 관리",
-    section: "제28조 근무시간",
-    score: "0.74",
-    highlight:
-      "정규 근무시간은 회사가 정한 기준에 따르며, 부서별 업무 특성에 따라 조정될 수 있다.",
-    chunk:
-      "정규 근무시간은 회사가 정한 기준에 따르며, 부서별 업무 특성에 따라 조정될 수 있다. 근태 기록은 시스템에 의해 관리된다.",
-    answer: "근무시간은 회사 기준에 따르며 부서별로 조정될 수 있습니다.",
-  },
-  {
-    page: "18",
-    title: "제7장 휴가 및 복무",
-    section: "제32조 출산전후휴가",
-    score: "0.92",
-    highlight:
-      "출산전후휴가는 총 90일로 하며, 출산 후 휴가 기간은 최소 45일 이상 확보되어야 한다.",
-    chunk:
-      "출산전후휴가는 총 90일로 하며, 출산 후 휴가 기간은 최소 45일 이상 확보되어야 한다. 다태아 임신의 경우 출산전후휴가는 총 120일로 한다.",
-    answer: "출산전후휴가는 총 90일입니다.",
-  },
-  {
-    page: "19",
-    title: "제7장 휴가 및 복무",
-    section: "제33조 육아휴직",
-    score: "0.81",
-    highlight:
-      "육아휴직은 관련 법령과 회사 규정에 따라 신청할 수 있으며, 승인 절차를 거친다.",
-    chunk:
-      "육아휴직은 관련 법령과 회사 규정에 따라 신청할 수 있으며, 승인 절차를 거친다. 신청자는 사전에 필요 서류를 제출해야 한다.",
-    answer: "육아휴직은 규정에 따라 신청 및 승인 절차를 거칩니다.",
-  },
-];
 
 function MetaPill({ children }) {
   return (
@@ -79,6 +47,7 @@ function SourceRow({ label, children }) {
 }
 
 export default function DocumentDetailPage() {
+  const navigate = useNavigate();
   const [selectedPage, setSelectedPage] = useState("18");
 
   const selectedSource = useMemo(() => {
@@ -92,10 +61,18 @@ export default function DocumentDetailPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] p-6 font-sans text-slate-950">
-      <div className="mx-auto flex h-[800px] max-w-[1296px] flex-col gap-[22px]">
+    <AppLayout>
+      <div className="mx-auto flex min-h-[calc(100vh-136px)] max-w-[1296px] flex-col gap-[22px]">
         <header className="flex items-center gap-5">
           <div className="flex-1">
+            <button
+              type="button"
+              onClick={() => navigate("/documents")}
+              className="mb-3 text-sm font-bold text-slate-500 transition hover:text-blue-600"
+            >
+              ← 문서 관리로 돌아가기
+            </button>
+
             <h1 className="text-[34px] font-bold tracking-normal">
               문서 상세 보기
             </h1>
@@ -176,10 +153,10 @@ export default function DocumentDetailPage() {
 
             <section className="rounded-2xl border border-blue-200 bg-blue-50 p-3.5">
               <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-bold text-blue-600">
-                AI 답변 근거
+                답변에 사용된 출처
               </span>
               <p className="mt-2 text-[15px] font-bold text-slate-950">
-                이 출처로 답변 생성됨
+                선택한 문단이 AI 답변의 근거로 사용되었습니다.
               </p>
             </section>
 
@@ -213,6 +190,7 @@ export default function DocumentDetailPage() {
 
             <button
               type="button"
+              onClick={() => navigate("/chat")}
               className="mt-auto h-11 rounded-xl bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700"
             >
               이 문서로 질문하기
@@ -220,6 +198,6 @@ export default function DocumentDetailPage() {
           </aside>
         </div>
       </div>
-    </main>
+    </AppLayout>
   );
 }
