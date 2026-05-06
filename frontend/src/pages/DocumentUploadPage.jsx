@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { uploadQueue } from "../data/mockData";
 import { AppLayout, PdfIcon, StatusBadge } from "../components/ui";
+import { uploadDocument } from "../lib/api";
 
 const stages = [
   "업로드 완료",
@@ -26,30 +26,96 @@ export default function DocumentUploadPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  const [documents, setDocuments] = useState(uploadQueue);
+  const [documents, setDocuments] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   const handleFileSelect = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event) => {
+  const handleFileChange = async (event) => {
     const files = Array.from(event.target.files || []);
-    const pdfFiles = files.filter((file) => file.type === "application/pdf");
+    const pdfFiles = files.filter(
+      (file) =>
+        file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+    );
 
-    const newDocuments = pdfFiles.map((file) => ({
-      id: `${file.name}-${Date.now()}`,
+    event.target.value = "";
+
+    if (pdfFiles.length === 0) {
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError("");
+
+    const placeholders = pdfFiles.map((file, index) => ({
+      tempId: `uploading-${file.name}-${file.lastModified}-${index}`,
       name: file.name,
       size: formatFileSize(file.size),
-      uploadedAt: "2026-05-06",
-      uploadedTime: "방금",
+      uploadedTime: "업로드 중",
       pages: "-",
       chunks: "-",
-      status: "업로드 완료",
-      progress: 10,
+      status: "처리 중",
+      progress: 40,
     }));
 
-    setDocuments((prevDocuments) => [...newDocuments, ...prevDocuments]);
-    event.target.value = "";
+    setDocuments((prevDocuments) => [...placeholders, ...prevDocuments]);
+
+    const results = await Promise.allSettled(
+      pdfFiles.map(async (file, index) => {
+        const response = await uploadDocument(file);
+        const data = response?.data || {};
+        return {
+          tempId: placeholders[index].tempId,
+          id: data.document_id ?? placeholders[index].tempId,
+          name: data.file_name || file.name,
+          size: formatFileSize(file.size),
+          uploadedTime: "방금",
+          pages: data.page_count ?? "-",
+          chunks: data.chunk_count ?? "-",
+          status: "처리 완료",
+          progress: 100,
+        };
+      })
+    );
+
+    const resolvedDocuments = results.map((result, index) => {
+      if (result.status === "fulfilled") {
+        return result.value;
+      }
+
+      return {
+        tempId: placeholders[index].tempId,
+        id: placeholders[index].tempId,
+        name: placeholders[index].name,
+        size: placeholders[index].size,
+        uploadedTime: "실패",
+        pages: "-",
+        chunks: "-",
+        status: "업로드 실패",
+        progress: 100,
+      };
+    });
+
+    setDocuments((prevDocuments) =>
+      prevDocuments.map((doc) => {
+        const resolved = resolvedDocuments.find((item) => item.tempId === doc.tempId);
+        if (!resolved) {
+          return doc;
+        }
+
+        return { ...resolved };
+      })
+    );
+
+    const hasFailure = results.some((result) => result.status === "rejected");
+    if (hasFailure) {
+      setUploadError("일부 파일 업로드에 실패했습니다. 파일 형식과 서버 상태를 확인해 주세요.");
+    }
+
+    setIsUploading(false);
   };
 
   return (
@@ -102,10 +168,15 @@ export default function DocumentUploadPage() {
             <button
               type="button"
               onClick={handleFileSelect}
+              disabled={isUploading}
               className="h-[50px] rounded-[14px] bg-blue-600 text-[15px] font-bold text-white transition hover:bg-blue-700"
             >
-              파일 선택
+              {isUploading ? "업로드 중..." : "파일 선택"}
             </button>
+
+            {uploadError && (
+              <p className="text-sm font-semibold text-red-600">{uploadError}</p>
+            )}
 
             <div className="rounded-[18px] border border-blue-200 bg-blue-50 p-4">
               <h3 className="text-sm font-bold text-blue-600">처리 단계</h3>
