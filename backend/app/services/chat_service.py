@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.chunk import Chunk
 from app.models.document import Document
-from app.schemas.chat import ChatResponse, SourceItem
+from app.schemas.chat import ChatData, SourceItem
 
 
 @dataclass(frozen=True)
@@ -158,7 +158,7 @@ def _rank_chunks(db: Session, question: str, limit: int = 3) -> list[RankedChunk
     return ranked[:limit]
 
 
-def generate_chat_response(question: str, db: Session) -> ChatResponse:
+def generate_chat_response(question: str, db: Session) -> ChatData:
     """Generate a mock RAG response that can later be replaced by a real LLM call."""
     cleaned_question = question.strip()
     if not cleaned_question:
@@ -167,7 +167,7 @@ def generate_chat_response(question: str, db: Session) -> ChatResponse:
     # Keep only the single most relevant chunk so the response stays focused.
     ranked_chunks = _rank_chunks(db, cleaned_question, limit=1)
     if not ranked_chunks:
-        return ChatResponse(
+        return ChatData(
             answer="관련 문서를 찾지 못했습니다. 다른 표현으로 질문해 주세요.",
             sources=[],
         )
@@ -179,4 +179,4 @@ def generate_chat_response(question: str, db: Session) -> ChatResponse:
         f"{_build_answer_from_source(top_source.content, _tokenize(cleaned_question))} "
         f"(참고문서: {top_source.document} {top_source.page}페이지)"
     )
-    return ChatResponse(answer=answer, sources=sources)
+    return ChatData(answer=answer, sources=sources)
