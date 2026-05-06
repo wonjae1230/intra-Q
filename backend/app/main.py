@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.db.init_db import init_db
+from app.routers.chat import router as chat_router
 from app.routers.documents import router as documents_router
 
 
@@ -19,4 +20,5 @@ def health_check() -> dict[str, str]:
 
 
 app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
+app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 

@@ -5,9 +5,7 @@ from collections.abc import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-
-# SQLite database stored next to the backend application.
-DATABASE_URL = "sqlite:///./intra_q.db"
+from app.core.settings import DATABASE_URL
 
 engine = create_engine(
     DATABASE_URL,
