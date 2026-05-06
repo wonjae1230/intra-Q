@@ -1,17 +1,55 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { documents as initialDocuments } from "../data/mockData";
 import { ActionButton, AppLayout, PdfIcon, StatusBadge } from "../components/ui";
+import { getDocuments } from "../lib/api";
+
+const USE_MOCK_FALLBACK = false;
+
+function mapDocumentFromApi(item) {
+  return {
+    id: item.document_id ?? item.id,
+    name: item.file_name ?? item.name ?? "unknown.pdf",
+    size: item.size ?? "-",
+    uploadedAt: item.uploaded_at?.slice?.(0, 10) ?? "-",
+    pages: item.page_count ?? item.pages ?? "-",
+    chunks: item.chunk_count ?? item.chunks ?? "-",
+    status: item.status ?? "처리 완료",
+  };
+}
 
 export default function DocumentManagementPage() {
   const navigate = useNavigate();
 
-  const [documents, setDocuments] = useState(initialDocuments);
+  const [documents, setDocuments] = useState([]);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterStatus, setFilterStatus] = useState("전체");
+  const [loadError, setLoadError] = useState("");
 
   const filterButtons = ["전체", "처리 완료", "처리 중"];
+
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        setLoadError("");
+        const response = await getDocuments();
+        const rows =
+          response?.data?.documents ?? response?.data ?? response?.documents ?? [];
+
+        if (!Array.isArray(rows)) {
+          throw new Error("문서 목록 응답 형식이 올바르지 않습니다.");
+        }
+
+        setDocuments(rows.map(mapDocumentFromApi));
+      } catch (error) {
+        setLoadError(error.message);
+        setDocuments(USE_MOCK_FALLBACK ? initialDocuments : []);
+      }
+    };
+
+    loadDocuments();
+  }, []);
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
@@ -171,9 +209,7 @@ export default function DocumentManagementPage() {
               <p className="text-sm font-bold text-slate-700">
                 검색 결과가 없습니다.
               </p>
-              <p className="text-xs text-slate-500">
-                다른 문서명으로 검색하거나 필터를 변경해보세요.
-              </p>
+              <p className="text-xs text-slate-500">{loadError || "다른 문서명으로 검색하거나 필터를 변경해보세요."}</p>
             </div>
           )}
         </section>

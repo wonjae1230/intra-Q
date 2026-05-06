@@ -1,34 +1,73 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { documents, sources } from "../data/mockData";
 import { AppLayout, PdfIcon, StatusBadge } from "../components/ui";
+import { askQuestion, getDocuments } from "../lib/api";
+
+function mapDocumentFromApi(item) {
+  return {
+    id: item.document_id ?? item.id,
+    name: item.file_name ?? item.name ?? "unknown.pdf",
+    pages: item.page_count ?? item.pages ?? "-",
+    size: item.size ?? "-",
+    status: item.status ?? "처리 완료",
+  };
+}
+
+function mapSourceFromApi(source, index) {
+  const score =
+    typeof source?.score === "number"
+      ? source.score.toFixed(2)
+      : typeof source?.distance === "number"
+        ? (1 / (1 + source.distance)).toFixed(2)
+        : "-";
+
+  return {
+    id: `${source?.document || source?.file_name || "source"}-${source?.page || index}-${index}`,
+    documentName: source?.file_name || source?.document || "unknown.pdf",
+    page: source?.page ?? "-",
+    score,
+    text: source?.text || source?.preview || source?.content || "",
+  };
+}
 
 export default function ChatPage() {
   const navigate = useNavigate();
 
   const [question, setQuestion] = useState("");
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "user",
-      text: "출산휴가는 며칠이야?",
-    },
-    {
-      id: 2,
-      type: "ai",
-      text: "출산전후휴가는 총 90일입니다. 이 중 출산 후 휴가 기간은 최소 45일 이상 확보되어야 하며, 다태아의 경우 총 120일로 확대됩니다.",
-      evidence: "근거: 인사규정.pdf · 제7장 휴가 및 복무",
-      sources,
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [isSending, setIsSending] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        setLoadError("");
+        const response = await getDocuments();
+        const rows =
+          response?.data?.documents ?? response?.data ?? response?.documents ?? [];
+
+        if (!Array.isArray(rows)) {
+          throw new Error("문서 목록 응답 형식이 올바르지 않습니다.");
+        }
+
+        setDocuments(rows.map(mapDocumentFromApi));
+      } catch (error) {
+        setLoadError(error.message);
+        setDocuments([]);
+      }
+    };
+
+    loadDocuments();
+  }, []);
 
   const activeDocuments = documents.filter((doc) => doc.status === "처리 완료");
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     const trimmedQuestion = question.trim();
 
-    if (!trimmedQuestion) {
+    if (!trimmedQuestion || isSending) {
       return;
     }
 
@@ -38,16 +77,47 @@ export default function ChatPage() {
       text: trimmedQuestion,
     };
 
-    const aiMessage = {
-      id: Date.now() + 1,
-      type: "ai",
-      text: "현재는 백엔드 API 연동 전 단계입니다. 이후 업로드된 문서에서 관련 청크를 검색해 출처와 함께 답변을 생성할 예정입니다.",
-      evidence: "근거: API 연결 전 임시 응답",
-      sources: [],
-    };
-
-    setMessages((prevMessages) => [...prevMessages, userMessage, aiMessage]);
+    setMessages((prevMessages) => [...prevMessages, userMessage]);
     setQuestion("");
+    setIsSending(true);
+
+    try {
+      const response = await askQuestion(
+        trimmedQuestion,
+        activeDocuments.map((doc) => doc.id)
+      );
+      const chatData = response?.data || {};
+      const sources = Array.isArray(chatData.sources)
+        ? chatData.sources.map(mapSourceFromApi)
+        : [];
+      const firstSource = sources[0];
+
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          id: Date.now() + 1,
+          type: "ai",
+          text: chatData.answer || "답변이 비어 있습니다.",
+          evidence: firstSource
+            ? `근거: ${firstSource.documentName} · p.${firstSource.page}`
+            : "",
+          sources,
+        },
+      ]);
+    } catch (error) {
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          id: Date.now() + 1,
+          type: "ai",
+          text: "질문 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+          evidence: error.message,
+          sources: [],
+        },
+      ]);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleKeyDown = (event) => {
@@ -67,9 +137,7 @@ export default function ChatPage() {
 
             <div>
               <h1 className="text-lg font-bold">사내 문서 Q&amp;A</h1>
-              <p className="text-[13px] text-slate-500">
-                문서 검색 · 출처 확인
-              </p>
+              <p className="text-[13px] text-slate-500">문서 검색 · 출처 확인</p>
             </div>
           </div>
 
@@ -130,12 +198,15 @@ export default function ChatPage() {
           </section>
 
           <div className="mt-auto rounded-2xl border border-blue-200 bg-blue-50 p-3.5">
-            <p className="text-[13px] font-bold text-blue-600">
-              문서가 없나요?
-            </p>
+            <p className="text-[13px] font-bold text-blue-600">문서가 없나요?</p>
             <p className="mt-1.5 text-xs leading-relaxed text-slate-700">
               PDF를 업로드하면 질문 입력창에서 바로 검색할 수 있습니다.
             </p>
+            {loadError && (
+              <p className="mt-2 text-xs font-semibold text-red-600">
+                문서 목록 로드 실패: {loadError}
+              </p>
+            )}
           </div>
         </aside>
 
@@ -250,9 +321,10 @@ export default function ChatPage() {
               <button
                 type="button"
                 onClick={handleSendMessage}
-                className="h-12 w-28 rounded-[14px] bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700"
+                disabled={isSending}
+                className="h-12 w-28 rounded-[14px] bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                전송
+                {isSending ? "전송 중..." : "전송"}
               </button>
             </div>
 
