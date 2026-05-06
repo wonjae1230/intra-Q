@@ -14,6 +14,8 @@ from app.models.chunk import Chunk
 from app.models.document import Document
 from app.schemas.documents import (
     DocumentChunkItem,
+    DocumentDeleteData,
+    DocumentDeleteResponse,
     DocumentDetailData,
     DocumentDetailResponse,
     DocumentListItem,
@@ -197,4 +199,49 @@ def get_document(document_id: int, db: Session = Depends(get_db)) -> DocumentDet
                 for c in chunks
             ],
         ),
+    )
+
+
+@router.delete(
+    "/{document_id}",
+    response_model=DocumentDeleteResponse,
+    summary="Delete a document and its chunks",
+    description="Delete the selected document and all related chunks from SQLite. The response includes the number of deleted chunks.",
+)
+def delete_document(document_id: int, db: Session = Depends(get_db)) -> DocumentDeleteResponse:
+    """Delete a document and its related chunks in a transaction-safe order."""
+    logger.info("Delete request received: document_id=%s", document_id)
+
+    try:
+        document = db.query(Document).filter(Document.id == document_id).first()
+    except (OperationalError, SQLAlchemyError) as exc:
+        logger.error("Delete document lookup DB error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=503, detail="DB 연결 실패") from exc
+
+    if not document:
+        logger.info("Delete request for missing document: document_id=%s", document_id)
+        raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
+
+    deleted_document_id = document.id
+
+    try:
+        deleted_chunks = db.query(Chunk).filter(Chunk.document_id == deleted_document_id).delete(synchronize_session=False)
+
+        # TODO: 추후 RAG vector DB에 저장된 embedding도 함께 삭제 필요
+        db.query(Document).filter(Document.id == deleted_document_id).delete(synchronize_session=False)
+
+        db.commit()
+    except (OperationalError, SQLAlchemyError) as exc:
+        db.rollback()
+        logger.error("Delete DB error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="DB 삭제 실패") from exc
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Delete server error")
+        raise HTTPException(status_code=500, detail="내부 서버 오류") from exc
+
+    logger.info("Delete succeeded: document_id=%s, deleted_chunks=%s", deleted_document_id, deleted_chunks)
+    return DocumentDeleteResponse(
+        message="Document deleted successfully",
+        data=DocumentDeleteData(document_id=deleted_document_id, deleted_chunks=int(deleted_chunks)),
     )

@@ -41,6 +41,11 @@ class DocumentListData(BaseModel):
     items: list[DocumentListItem] = Field(default_factory=list)
 
 
+class DocumentDeleteData(BaseModel):
+    document_id: int
+    deleted_chunks: int
+
+
 class DocumentUploadResponse(ApiResponseBase):
     data: DocumentUploadData
 
@@ -51,3 +56,7 @@ class DocumentDetailResponse(ApiResponseBase):
 
 class DocumentListResponse(ApiResponseBase):
     data: list[DocumentListItem]
+
+
+class DocumentDeleteResponse(ApiResponseBase):
+    data: DocumentDeleteData
