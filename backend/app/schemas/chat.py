@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas.common import ApiResponseBase
+
 
 class ChatRequest(BaseModel):
     """Request body for the chat endpoint."""
@@ -25,8 +27,14 @@ class SourceItem(BaseModel):
     preview: str
 
 
-class ChatResponse(BaseModel):
-    """Chat API response returned to the frontend."""
+class ChatData(BaseModel):
+    """Chat payload returned to the frontend."""
 
     answer: str
     sources: list[SourceItem] = Field(default_factory=list)
+
+
+class ChatResponse(ApiResponseBase):
+    """Envelope for chat API responses."""
+
+    data: ChatData
