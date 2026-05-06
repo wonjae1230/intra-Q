@@ -23,7 +23,7 @@ export async function uploadDocument(file) {
 
   return request("/api/documents/upload", {
     method: "POST",
-    body: formData, 
+    body: formData,
   });
 }
 
@@ -36,6 +36,12 @@ export async function getDocument(documentId) {
 export async function getDocuments() {
   return request("/api/documents", {
     method: "GET",
+  });
+}
+
+export async function deleteDocument(documentId) {
+  return request(`/api/documents/${documentId}`, {
+    method: "DELETE",
   });
 }
 
