@@ -24,6 +24,7 @@ from app.schemas.documents import (
     DocumentUploadResponse,
 )
 from app.services.chunk_service import build_page_chunks
+from rag.pipeline import delete_document_embeddings, embed_chunks
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -97,6 +98,31 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         logger.exception("Upload server error")
         raise HTTPException(status_code=500, detail="내부 서버 오류") from exc
 
+    embedding_status = "success"
+    embedding_message = None
+    embedding_payload = [
+        {
+            "content": chunk["content"],
+            "document_id": document_row.id,
+            "file_name": document_row.file_name,
+            "page": chunk["page_number"],
+        }
+        for chunk in chunks
+    ]
+
+    try:
+        embedding_result = embed_chunks(embedding_payload)
+        logger.info(
+            "RAG embedding succeeded: document_id=%s, stored_count=%s, ids=%s",
+            document_row.id,
+            embedding_result.get("stored_count"),
+            embedding_result.get("ids"),
+        )
+    except Exception as exc:
+        embedding_status = "failed"
+        embedding_message = "RAG embedding failed; document stored in SQLite only."
+        logger.error("RAG embedding failed: document_id=%s, error=%s", document_row.id, exc, exc_info=True)
+
     logger.info("Upload succeeded: document_id=%s, filename=%s, chunks=%s", document_row.id, document_row.file_name, len(chunks))
     return DocumentUploadResponse(
         message="Document uploaded successfully",
@@ -105,6 +131,8 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
             file_name=document_row.file_name,
             page_count=document_row.page_count,
             chunk_count=len(chunks),
+            embedding_status=embedding_status,
+            embedding_message=embedding_message,
         ),
     )
 
@@ -227,7 +255,6 @@ def delete_document(document_id: int, db: Session = Depends(get_db)) -> Document
     try:
         deleted_chunks = db.query(Chunk).filter(Chunk.document_id == deleted_document_id).delete(synchronize_session=False)
 
-        # TODO: 추후 RAG vector DB에 저장된 embedding도 함께 삭제 필요
         db.query(Document).filter(Document.id == deleted_document_id).delete(synchronize_session=False)
 
         db.commit()
@@ -239,6 +266,16 @@ def delete_document(document_id: int, db: Session = Depends(get_db)) -> Document
         db.rollback()
         logger.exception("Delete server error")
         raise HTTPException(status_code=500, detail="내부 서버 오류") from exc
+
+    try:
+        deleted_embeddings = delete_document_embeddings(deleted_document_id)
+        logger.info(
+            "RAG embedding cleanup succeeded: document_id=%s, deleted_embeddings=%s",
+            deleted_document_id,
+            deleted_embeddings.get("deleted_count"),
+        )
+    except Exception as exc:
+        logger.error("RAG embedding cleanup failed: document_id=%s, error=%s", deleted_document_id, exc, exc_info=True)
 
     logger.info("Delete succeeded: document_id=%s, deleted_chunks=%s", deleted_document_id, deleted_chunks)
     return DocumentDeleteResponse(

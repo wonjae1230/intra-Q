@@ -70,9 +70,13 @@ def _dedupe_sources(chunks: list[Source]) -> list[dict[str, Any]]:
         seen.add(key)
         sources.append(
             {
+                "document_id": chunk.get("document_id"),
                 "file_name": chunk.get("file_name"),
+                "document_name": chunk.get("file_name"),
                 "page": chunk.get("page"),
                 "content": chunk.get("content"),
+                "chunk_text": chunk.get("content"),
+                "distance": chunk.get("distance"),
             }
         )
     return sources

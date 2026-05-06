@@ -1,195 +1,78 @@
 from __future__ import annotations
 
+import logging
 import time
-import re
-from dataclasses import dataclass
+from typing import Any
 
-from sqlalchemy.orm import Session
-
-from app.models.chunk import Chunk
-from app.models.document import Document
 from app.schemas.chat import ChatData, SourceItem
+from rag.pipeline import query as rag_query
 
 
-@dataclass(frozen=True)
-class RankedChunk:
-    """Internal helper used to rank chunks without tying the code to embeddings."""
-
-    score: int
-    document_id: int
-    document_name: str
-    page: int
-    chunk_text: str
-    content_length: int
+logger = logging.getLogger(__name__)
 
 
-_KOREAN_SUFFIXES = ("은", "는", "이", "가", "을", "를", "에", "와", "과", "도", "로", "으로")
-_QUESTION_STOPWORDS = {
-    "회사",
-    "정책",
-    "어떻게",
-    "되나요",
-    "무엇",
-    "무슨",
-    "있나요",
-    "알려",
-    "주세요",
-}
+def _coerce_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
-def _normalize_token(token: str) -> str:
-    """Strip a few common Korean particles so search behaves less rigidly."""
-    normalized = token.strip().lower()
-    if len(normalized) <= 1:
-        return normalized
-
-    for suffix in _KOREAN_SUFFIXES:
-        if normalized.endswith(suffix) and len(normalized) > len(suffix):
-            return normalized[: -len(suffix)]
-    return normalized
+def _coerce_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
-def _tokenize(text: str) -> set[str]:
-    """Split a question into simple search tokens.
+def _map_source_item(source: dict[str, Any]) -> SourceItem:
+    document_id = _coerce_int(source.get("document_id"))
+    document_name = source.get("document_name") or source.get("file_name") or "unknown.pdf"
+    chunk_text = source.get("chunk_text") or source.get("content") or ""
+    distance = _coerce_float(source.get("distance"))
+    similarity_score = _coerce_float(source.get("similarity_score"))
+    if similarity_score is None:
+        similarity_score = _coerce_float(source.get("score"))
+    if similarity_score is None and distance is not None:
+        similarity_score = max(0.0, 1.0 - distance)
 
-    This mock implementation uses basic token overlap so the structure can later
-    be replaced with embedding/vector search without changing the API contract.
-    """
-    tokens: set[str] = set()
-    for token in re.findall(r"[0-9A-Za-z가-힣]+", text.lower()):
-        normalized = _normalize_token(token)
-        if normalized:
-            tokens.add(normalized)
-            tokens.add(token)
-    return tokens
-
-
-def _score_chunk(question_tokens: set[str], content: str) -> int:
-    """Score a chunk by simple token overlap and substring matches."""
-    lowered = content.lower()
-    score = 0
-    for token in question_tokens:
-        if token in lowered:
-            score += 1
-    return score
-
-
-def _build_preview(content: str, question_tokens: set[str], window: int = 80) -> str:
-    """Return a short snippet around the most relevant matched term."""
-    lowered = content.lower()
-    matched_terms = [token for token in question_tokens if token and token in lowered]
-    if not matched_terms:
-        return content[: window * 2].strip()
-
-    # Prefer longer matches so the preview anchors around the more specific term.
-    matched_terms.sort(key=len, reverse=True)
-    match_index = -1
-    matched_term = matched_terms[0]
-    for term in matched_terms:
-        match_index = lowered.find(term)
-        if match_index >= 0:
-            matched_term = term
-            break
-
-    start = max(0, match_index - window)
-    end = min(len(content), match_index + len(matched_term) + window)
-    snippet = content[start:end].strip()
-
-    if start > 0:
-        snippet = f"...{snippet}"
-    if end < len(content):
-        snippet = f"{snippet}..."
-    return snippet
-
-
-def _build_answer_from_source(content: str, question_tokens: set[str]) -> str:
-    """Build a short answer from the most relevant sentence in the source chunk."""
-    sentences = [segment.strip() for segment in re.split(r"(?<=[.!?。！？])\s+|\n+", content) if segment.strip()]
-    if not sentences:
-        return content.strip()
-
-    meaningful_tokens = {token for token in question_tokens if token not in _QUESTION_STOPWORDS}
-    if not meaningful_tokens:
-        meaningful_tokens = question_tokens
-
-    best_sentence = sentences[0]
-    best_score = -1
-    for sentence in sentences:
-        lowered = sentence.lower()
-        score = sum(1 for token in meaningful_tokens if token and token in lowered)
-        if len(sentence) < 25:
-            score -= 2
-        if score > best_score or (score == best_score and len(sentence) > len(best_sentence)):
-            best_score = score
-            best_sentence = sentence
-
-    return best_sentence
-
-
-def _rank_chunks(db: Session, question: str, limit: int = 3) -> list[RankedChunk]:
-    """Fetch chunks from SQLite and rank them with a lightweight mock search."""
-    question_tokens = _tokenize(question)
-    if not question_tokens:
-        return []
-
-    rows = (
-        db.query(Chunk, Document.file_name)
-        .join(Document, Chunk.document_id == Document.id)
-        .all()
+    return SourceItem(
+        document_id=document_id,
+        document_name=str(document_name),
+        file_name=str(source.get("file_name")) if source.get("file_name") else None,
+        page=_coerce_int(source.get("page")),
+        chunk_text=str(chunk_text),
+        similarity_score=similarity_score,
+        content=str(source.get("content")) if source.get("content") else None,
+        distance=distance,
     )
 
-    ranked: list[RankedChunk] = []
-    for chunk, file_name in rows:
-        score = _score_chunk(question_tokens, chunk.content)
-        if score <= 0:
-            continue
 
-        ranked.append(
-            RankedChunk(
-                score=score,
-                document_id=chunk.document_id,
-                document_name=file_name,
-                page=chunk.page_number,
-                chunk_text=chunk.content,
-                content_length=len(chunk.content),
-            )
-        )
-
-    ranked.sort(key=lambda item: (-item.score, item.document_name.lower(), item.page, -item.content_length))
-    return ranked[:limit]
-
-
-def generate_chat_response(question: str, db: Session) -> ChatData:
-    """Generate a mock RAG response that can later be replaced by a real LLM call."""
+def generate_chat_response(
+    question: str,
+    document_ids: list[int] | None = None,
+    top_k: int | None = None,
+) -> ChatData:
+    """Generate a RAG response from the vector store and LLM pipeline."""
     started_at = time.perf_counter()
     cleaned_question = question.strip()
     if not cleaned_question:
         raise ValueError("질문은 비어 있을 수 없습니다.")
 
-    # Keep only the single most relevant chunk so the response stays focused.
-    ranked_chunks = _rank_chunks(db, cleaned_question, limit=1)
-    if not ranked_chunks:
-        return ChatData(
-            answer="관련 문서를 찾지 못했습니다. 다른 표현으로 질문해 주세요.",
-            sources=[],
-            latency_ms=max(1, int((time.perf_counter() - started_at) * 1000)),
-        )
+    if document_ids is not None:
+        logger.info("Chat document filter requested: document_ids=%s", document_ids)
 
-    top_source = ranked_chunks[0]
-    sources = [
-        SourceItem(
-            document_id=top_source.document_id,
-            document_name=top_source.document_name,
-            page=top_source.page,
-            chunk_text=top_source.chunk_text,
-            similarity_score=None,
-        )
-    ]
+    rag_result = rag_query(cleaned_question, top_k=top_k, document_ids=document_ids)
+    answer = str(rag_result.get("answer") or "")
+    sources = [_map_source_item(source) for source in rag_result.get("sources", []) if isinstance(source, dict)]
 
-    answer = (
-        f"{_build_answer_from_source(top_source.chunk_text, _tokenize(cleaned_question))} "
-        f"(참고문서: {top_source.document_name} {top_source.page}페이지)"
-    )
+    if not answer.strip():
+        answer = "관련 문서를 찾지 못했습니다. 다른 표현으로 질문해 주세요."
+
     return ChatData(
         answer=answer,
         sources=sources,

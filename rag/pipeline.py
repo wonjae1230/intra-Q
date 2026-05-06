@@ -29,7 +29,11 @@ def embed_chunks(chunks: list[Chunk]) -> dict[str, Any]:
     return {"stored_count": len(ids), "ids": ids}
 
 
-def query(question: str, top_k: int | None = None) -> dict[str, Any]:
+def query(
+    question: str,
+    top_k: int | None = None,
+    document_ids: list[int] | None = None,
+) -> dict[str, Any]:
     """Answer a question using retrieved chunks and return answer plus sources."""
 
     if not question or not question.strip():
@@ -38,8 +42,19 @@ def query(question: str, top_k: int | None = None) -> dict[str, Any]:
     config = get_config()
     retriever = Retriever()
     generator = AnswerGenerator()
-    chunks = retriever.retrieve(question, top_k=top_k or config.top_k)
+    chunks = retriever.retrieve(question, top_k=top_k or config.top_k, document_ids=document_ids)
     return generator.generate(question, chunks)
+
+
+def delete_document_embeddings(document_id: int) -> dict[str, Any]:
+    """Delete all stored embeddings for one document from the vector store."""
+
+    if document_id <= 0:
+        raise ValueError("document_id must be positive")
+
+    store = ChromaVectorStore()
+    deleted_count = store.delete_by_document_id(document_id)
+    return {"deleted_count": deleted_count}
 
 
 def _validate_chunks(chunks: list[Chunk]) -> None:

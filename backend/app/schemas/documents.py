@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +13,8 @@ class DocumentUploadData(BaseModel):
     file_name: str
     page_count: int
     chunk_count: int
+    embedding_status: Literal["success", "failed"] = "success"
+    embedding_message: str | None = None
 
 
 class DocumentChunkItem(BaseModel):
