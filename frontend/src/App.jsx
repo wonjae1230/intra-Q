@@ -1,7 +1,7 @@
-import EmptyStatePage from "./pages/EmptyStatePage";
+import ErrorStatePage from "./pages/ErrorStatePage";
 
 function App() {
-  return <EmptyStatePage />;
+  return <ErrorStatePage />;
 }
 
 export default App;
