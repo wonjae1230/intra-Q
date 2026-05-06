@@ -23,7 +23,7 @@ export async function uploadDocument(file) {
 
   return request("/api/documents/upload", {
     method: "POST",
-    body: formData,
+    body: formData, 
   });
 }
 
