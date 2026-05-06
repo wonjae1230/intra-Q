@@ -1,7 +1,7 @@
-import DocumentUploadPage from "./pages/DocumentUploadPage";
+import DocumentManagementPage from "./pages/DocumentManagementPage";
 
 function App() {
-  return <DocumentUploadPage />;
+  return <DocumentManagementPage />;
 }
 
 export default App;
