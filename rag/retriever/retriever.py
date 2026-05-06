@@ -16,14 +16,33 @@ class Retriever:
         self.embedder = embedder or GeminiTextEmbedder()
         self.store = store or ChromaVectorStore()
 
-    def retrieve(self, question: str, top_k: int | None = None) -> list[SearchResult]:
+    def retrieve(
+        self,
+        question: str,
+        top_k: int | None = None,
+        document_ids: list[int] | None = None,
+    ) -> list[SearchResult]:
         if not question or not question.strip():
             raise ValueError("question must not be empty")
 
         config = get_config()
         query_embedding = self.embedder.embed_text(question)
-        return self.store.query_by_embedding(query_embedding, top_k=top_k or config.top_k)
+        search_limit = top_k or config.top_k
+        if document_ids:
+            search_limit = max(search_limit, len(document_ids) * 5)
+
+        results = self.store.query_by_embedding(query_embedding, top_k=search_limit)
+        if not document_ids:
+            return results[: top_k or config.top_k]
+
+        allowed_ids = {str(document_id) for document_id in document_ids}
+        filtered_results = [result for result in results if str(result.get("document_id")) in allowed_ids]
+        return filtered_results[: top_k or config.top_k]
 
 
-def retrieve(question: str, top_k: int | None = None) -> list[SearchResult]:
-    return Retriever().retrieve(question, top_k=top_k)
+def retrieve(
+    question: str,
+    top_k: int | None = None,
+    document_ids: list[int] | None = None,
+) -> list[SearchResult]:
+    return Retriever().retrieve(question, top_k=top_k, document_ids=document_ids)

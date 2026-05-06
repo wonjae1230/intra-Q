@@ -98,3 +98,15 @@ class ChromaVectorStore:
 
         threshold = get_config().distance_threshold if distance_threshold is None else distance_threshold
         return [result for result in results if result["distance"] < threshold]
+
+    def delete_by_document_id(self, document_id: int) -> int:
+        if document_id <= 0:
+            raise ValueError("document_id must be positive")
+
+        existing = self._collection.get(where={"document_id": document_id})
+        ids = existing.get("ids", [])
+        if not ids:
+            return 0
+
+        self._collection.delete(ids=ids)
+        return len(ids)

@@ -12,7 +12,7 @@ configure_logging()
 
 app = FastAPI(
     title="intra-Q Document API",
-    description="FastAPI-based RAG chatbot backend for PDF upload, chunking, document retrieval, and mock chat responses.",
+    description="FastAPI-based RAG chatbot backend for PDF upload, chunking, document retrieval, and chat responses.",
     version="1.0.0",
 )
 
