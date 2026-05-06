@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.settings import ALLOWED_ORIGINS
 from app.database.init_db import init_db
 from app.routers.chat import router as chat_router
 from app.routers.documents import router as documents_router
@@ -19,7 +18,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,4 +48,3 @@ def health_check() -> HealthResponse:
 
 app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
 app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
-
