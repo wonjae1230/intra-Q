@@ -12,10 +12,18 @@ from dotenv import load_dotenv
 load_dotenv()
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=True)
 
+_RAG_DIR = Path(__file__).resolve().parent
+
+
+def _resolve_chroma_dir() -> str:
+    raw = os.getenv("CHROMA_PERSIST_DIR", "chroma_db")
+    p = Path(raw)
+    return str(p if p.is_absolute() else _RAG_DIR / raw)
+
 
 @dataclass(frozen=True)
 class RagConfig:
-    chroma_persist_dir: str = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
+    chroma_persist_dir: str = _resolve_chroma_dir()
     chroma_collection_name: str = os.getenv("CHROMA_COLLECTION_NAME", "intra_q_documents")
     embedding_model: str = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
     embedding_output_dimensionality: int = int(os.getenv("GEMINI_EMBEDDING_DIMENSIONS", "768"))
