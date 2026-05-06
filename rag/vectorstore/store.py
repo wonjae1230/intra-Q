@@ -58,14 +58,23 @@ class ChromaVectorStore:
         if not chunks:
             return []
 
-        ids = [build_chunk_id(chunk) for chunk in chunks]
+        seen: dict[str, tuple[Chunk, list[float]]] = {}
+        for chunk, embedding in zip(chunks, embeddings):
+            chunk_id = build_chunk_id(chunk)
+            if chunk_id not in seen:
+                seen[chunk_id] = (chunk, embedding)
+
+        unique_ids = list(seen.keys())
+        unique_chunks = [seen[i][0] for i in unique_ids]
+        unique_embeddings = [seen[i][1] for i in unique_ids]
+
         self._collection.upsert(
-            ids=ids,
-            embeddings=embeddings,
-            documents=[chunk["content"] for chunk in chunks],
-            metadatas=[_metadata_from_chunk(chunk) for chunk in chunks],
+            ids=unique_ids,
+            embeddings=unique_embeddings,
+            documents=[c["content"] for c in unique_chunks],
+            metadatas=[_metadata_from_chunk(c) for c in unique_chunks],
         )
-        return ids
+        return unique_ids
 
     def query_by_embedding(
         self,
