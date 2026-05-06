@@ -1,7 +1,7 @@
-import DocumentDetailPage from "./pages/DocumentDetailPage";
+import EmptyStatePage from "./pages/EmptyStatePage";
 
 function App() {
-  return <DocumentDetailPage />;
+  return <EmptyStatePage />;
 }
 
 export default App;
