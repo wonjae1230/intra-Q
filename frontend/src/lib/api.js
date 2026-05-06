@@ -39,6 +39,12 @@ export async function getDocuments() {
   });
 }
 
+export async function deleteDocument(documentId) {
+  return request(`/api/documents/${documentId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function askQuestion(question, documentIds = []) {
   return request("/api/chat", {
     method: "POST",

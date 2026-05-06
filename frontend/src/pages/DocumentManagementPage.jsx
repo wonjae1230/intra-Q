@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { documents as initialDocuments } from "../data/mockData";
 import { ActionButton, AppLayout, PdfIcon, StatusBadge } from "../components/ui";
-import { getDocuments } from "../lib/api";
+import { deleteDocument, getDocuments } from "../lib/api";
 
 const USE_MOCK_FALLBACK = false;
 
@@ -64,16 +64,22 @@ export default function DocumentManagementPage() {
     });
   }, [documents, searchKeyword, filterStatus]);
 
-  const handleDeleteDocument = (documentId) => {
+  const handleDeleteDocument = async (documentId) => {
     const confirmed = window.confirm("이 문서를 삭제하시겠습니까?");
 
     if (!confirmed) {
       return;
     }
 
-    setDocuments((prevDocuments) =>
-      prevDocuments.filter((doc) => doc.id !== documentId)
-    );
+    try {
+      await deleteDocument(documentId);
+
+      setDocuments((prevDocuments) =>
+        prevDocuments.filter((doc) => doc.id !== documentId)
+      );
+    } catch (error) {
+      alert(`문서 삭제에 실패했습니다: ${error.message}`);
+    }
   };
 
   return (
