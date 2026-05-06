@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -69,6 +70,32 @@ def split_text_into_chunks(text: str, min_size: int = 300, max_size: int = 500, 
     return chunks
 
 
+def _split_into_paragraphs(text: str) -> list[str]:
+    """Split text into coarse sections using blank lines and normalize spacing."""
+    sections = [section.strip() for section in re.split(r"\n\s*\n+", text.strip()) if section.strip()]
+    if not sections:
+        return []
+
+    paragraphs: list[str] = []
+    index = 0
+    while index < len(sections):
+        current = re.sub(r"[ \t]+", " ", sections[index]).strip()
+        if not current:
+            index += 1
+            continue
+
+        next_section = re.sub(r"[ \t]+", " ", sections[index + 1]).strip() if index + 1 < len(sections) else ""
+        is_heading_like = len(current) <= 30 and not re.search(r"[.!?。！？]", current)
+        if is_heading_like and next_section:
+            paragraphs.append(f"{current}\n\n{next_section}")
+            index += 2
+            continue
+
+        paragraphs.append(current)
+        index += 1
+    return paragraphs
+
+
 def build_page_chunks(pages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Convert extracted page text into database-ready chunk records."""
     chunk_rows: list[dict[str, Any]] = []
@@ -76,7 +103,8 @@ def build_page_chunks(pages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for page in pages:
         page_number = int(page["page"])
         text = str(page.get("text", ""))
-        for content in split_text_into_chunks(text):
-            chunk_rows.append({"page_number": page_number, "content": content})
+        for paragraph in _split_into_paragraphs(text):
+            for content in split_text_into_chunks(paragraph):
+                chunk_rows.append({"page_number": page_number, "content": content})
 
     return chunk_rows
