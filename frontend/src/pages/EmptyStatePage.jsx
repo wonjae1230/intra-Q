@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const steps = [
   {
@@ -75,19 +75,11 @@ function StepCard({ number, title, description }) {
 }
 
 export default function EmptyStatePage() {
-  const [notice, setNotice] = useState("");
-
-  const handleStartUpload = () => {
-    setNotice("문서 업로드 화면으로 이동할 예정입니다.");
-  };
-
-  const handleTrySample = () => {
-    setNotice("샘플 문서 체험 기능은 이후 연결 예정입니다.");
-  };
+  const navigate = useNavigate();
 
   return (
     <main className="min-h-screen bg-white p-6 font-sans text-slate-950">
-      <div className="mx-auto flex h-[760px] max-w-[1000px] flex-col items-center gap-7 pt-[70px]">
+      <div className="mx-auto flex min-h-[calc(100vh-48px)] max-w-[1000px] flex-col items-center justify-center gap-7">
         <Illustration />
 
         <section className="text-center">
@@ -108,7 +100,7 @@ export default function EmptyStatePage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={handleStartUpload}
+            onClick={() => navigate("/upload")}
             className="h-[50px] rounded-[14px] bg-blue-600 px-5 text-[15px] font-bold text-white transition hover:bg-blue-700"
           >
             문서 업로드 시작하기
@@ -116,18 +108,12 @@ export default function EmptyStatePage() {
 
           <button
             type="button"
-            onClick={handleTrySample}
+            onClick={() => navigate("/chat")}
             className="h-[50px] rounded-[14px] border border-slate-300 bg-white px-5 text-[15px] font-bold text-slate-700 transition hover:bg-slate-50"
           >
             샘플 문서로 체험하기
           </button>
         </div>
-
-        {notice && (
-          <div className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-600">
-            {notice}
-          </div>
-        )}
       </div>
     </main>
   );
