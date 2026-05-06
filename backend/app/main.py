@@ -1,5 +1,7 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.settings import ALLOWED_ORIGINS
 from app.database.init_db import init_db
 from app.routers.chat import router as chat_router
 from app.routers.documents import router as documents_router
@@ -13,6 +15,14 @@ app = FastAPI(
     title="intra-Q Document API",
     description="FastAPI-based RAG chatbot backend for PDF upload, chunking, document retrieval, and mock chat responses.",
     version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

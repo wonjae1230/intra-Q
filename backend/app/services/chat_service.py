@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import re
 from dataclasses import dataclass
 
@@ -15,10 +16,10 @@ class RankedChunk:
     """Internal helper used to rank chunks without tying the code to embeddings."""
 
     score: int
-    document: str
+    document_id: int
+    document_name: str
     page: int
-    preview: str
-    content: str
+    chunk_text: str
     content_length: int
 
 
@@ -146,20 +147,21 @@ def _rank_chunks(db: Session, question: str, limit: int = 3) -> list[RankedChunk
         ranked.append(
             RankedChunk(
                 score=score,
-                document=file_name,
+                document_id=chunk.document_id,
+                document_name=file_name,
                 page=chunk.page_number,
-                preview=_build_preview(chunk.content, question_tokens),
-                content=chunk.content,
+                chunk_text=chunk.content,
                 content_length=len(chunk.content),
             )
         )
 
-    ranked.sort(key=lambda item: (-item.score, item.document.lower(), item.page, -item.content_length))
+    ranked.sort(key=lambda item: (-item.score, item.document_name.lower(), item.page, -item.content_length))
     return ranked[:limit]
 
 
 def generate_chat_response(question: str, db: Session) -> ChatData:
     """Generate a mock RAG response that can later be replaced by a real LLM call."""
+    started_at = time.perf_counter()
     cleaned_question = question.strip()
     if not cleaned_question:
         raise ValueError("질문은 비어 있을 수 없습니다.")
@@ -170,13 +172,26 @@ def generate_chat_response(question: str, db: Session) -> ChatData:
         return ChatData(
             answer="관련 문서를 찾지 못했습니다. 다른 표현으로 질문해 주세요.",
             sources=[],
+            latency_ms=max(1, int((time.perf_counter() - started_at) * 1000)),
         )
 
     top_source = ranked_chunks[0]
-    sources = [SourceItem(document=top_source.document, page=top_source.page, preview=top_source.preview)]
+    sources = [
+        SourceItem(
+            document_id=top_source.document_id,
+            document_name=top_source.document_name,
+            page=top_source.page,
+            chunk_text=top_source.chunk_text,
+            similarity_score=None,
+        )
+    ]
 
     answer = (
-        f"{_build_answer_from_source(top_source.content, _tokenize(cleaned_question))} "
-        f"(참고문서: {top_source.document} {top_source.page}페이지)"
+        f"{_build_answer_from_source(top_source.chunk_text, _tokenize(cleaned_question))} "
+        f"(참고문서: {top_source.document_name} {top_source.page}페이지)"
     )
-    return ChatData(answer=answer, sources=sources)
+    return ChatData(
+        answer=answer,
+        sources=sources,
+        latency_ms=max(1, int((time.perf_counter() - started_at) * 1000)),
+    )
