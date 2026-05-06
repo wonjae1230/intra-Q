@@ -10,3 +10,9 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./intra_q.db")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+ALLOWED_ORIGINS = [
+	"http://localhost:5173",
+	"http://127.0.0.1:5173",
+	"http://localhost:3000",
+]

@@ -22,9 +22,11 @@ class ChatRequest(BaseModel):
 class SourceItem(BaseModel):
     """Source item returned to the frontend for traceability."""
 
-    document: str
+    document_id: int
+    document_name: str
     page: int
-    preview: str
+    chunk_text: str
+    similarity_score: float | None = None
 
 
 class ChatData(BaseModel):
@@ -32,6 +34,7 @@ class ChatData(BaseModel):
 
     answer: str
     sources: list[SourceItem] = Field(default_factory=list)
+    latency_ms: int
 
 
 class ChatResponse(ApiResponseBase):

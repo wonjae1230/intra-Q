@@ -5,6 +5,7 @@ from typing import Any
 
 import fitz
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,8 @@ from app.schemas.documents import (
     DocumentChunkItem,
     DocumentDetailData,
     DocumentDetailResponse,
+    DocumentListItem,
+    DocumentListResponse,
     DocumentUploadData,
     DocumentUploadResponse,
 )
@@ -101,6 +104,47 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
             page_count=document_row.page_count,
             chunk_count=len(chunks),
         ),
+    )
+
+
+@router.get(
+    "",
+    response_model=DocumentListResponse,
+    summary="List uploaded documents",
+    description="Return all uploaded documents ordered by latest upload first, including chunk counts for the frontend list view.",
+)
+def list_documents(db: Session = Depends(get_db)) -> DocumentListResponse:
+    """Return the uploaded document list for the frontend management screen."""
+    try:
+        rows = (
+            db.query(
+                Document.id,
+                Document.file_name,
+                Document.page_count,
+                Document.uploaded_at,
+                func.count(Chunk.id).label("chunk_count"),
+            )
+            .outerjoin(Chunk, Chunk.document_id == Document.id)
+            .group_by(Document.id, Document.file_name, Document.page_count, Document.uploaded_at)
+            .order_by(Document.uploaded_at.desc(), Document.id.desc())
+            .all()
+        )
+    except (OperationalError, SQLAlchemyError) as exc:
+        logger.error("List documents DB error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=503, detail="DB 연결 실패") from exc
+
+    return DocumentListResponse(
+        message="Documents retrieved successfully",
+        data=[
+            DocumentListItem(
+                id=row.id,
+                file_name=row.file_name,
+                page_count=row.page_count,
+                chunk_count=int(row.chunk_count),
+                uploaded_at=row.uploaded_at,
+            )
+            for row in rows
+        ],
     )
 
 
