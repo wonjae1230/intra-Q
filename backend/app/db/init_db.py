@@ -1,4 +1,5 @@
 from app.db.session import Base, engine
+from app.models.chat_message import ChatMessage
 from app.models.chunk import Chunk
 from app.models.document import Document
 
