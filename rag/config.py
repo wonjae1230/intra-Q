@@ -28,7 +28,7 @@ class RagConfig:
     chroma_distance_metric: str = os.getenv("CHROMA_DISTANCE_METRIC", "cosine")
     embedding_model: str = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
     chat_model: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
-    gemini_thinking_budget: int = int(os.getenv("GEMINI_THINKING_BUDGET", "0"))
+    vertex_ai_location: str = os.getenv("VERTEX_AI_LOCATION", "us-central1")
     top_k: int = int(os.getenv("RAG_TOP_K", "8"))
     distance_threshold: float = float(os.getenv("RAG_DISTANCE_THRESHOLD", "1.2"))
     # Vertex AI Reranker
