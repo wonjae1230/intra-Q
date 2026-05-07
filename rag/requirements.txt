@@ -1,7 +1,9 @@
 langchain
+langchain-openai
 langchain-google-genai
 langchain-community
 langchain-chroma
 chromadb
 pymupdf
 python-dotenv
+google-cloud-discoveryengine

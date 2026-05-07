@@ -7,6 +7,7 @@ from typing import Any
 from rag.config import get_config
 from rag.embeddings.embedder import OpenAITextEmbedder
 from rag.generator.generator import AnswerGenerator
+from rag.reranker.reranker import VertexAIReranker
 from rag.retriever.retriever import Retriever
 from rag.vectorstore.store import ChromaVectorStore
 
@@ -42,7 +43,16 @@ def query(
     config = get_config()
     retriever = Retriever()
     generator = AnswerGenerator()
-    chunks = retriever.retrieve(question, top_k=top_k or config.top_k, document_ids=document_ids)
+
+    final_top_k = top_k or config.top_k
+    if config.reranker_enabled:
+        fetch_k = final_top_k * config.reranker_fetch_multiplier
+        chunks = retriever.retrieve(question, top_k=fetch_k, document_ids=document_ids)
+        reranker = VertexAIReranker()
+        chunks = reranker.rerank(question, chunks, top_n=final_top_k)
+    else:
+        chunks = retriever.retrieve(question, top_k=final_top_k, document_ids=document_ids)
+
     return generator.generate(question, chunks)
 
 
