@@ -157,7 +157,7 @@ def _split_text(text: str, chunk_size: int, overlap: int) -> list[str]:
     return chunks
 
 
-def extract_chunks_from_pdf(pdf_path: str, chunk_size: int = 500, overlap: int = 50) -> list[dict]:
+def extract_chunks_from_pdf(pdf_path: str, chunk_size: int = 1000, overlap: int = 100) -> list[dict]:
     """PDF에서 텍스트와 표를 추출하고 청크로 분할한다."""
     doc = fitz.open(pdf_path)
     file_name = Path(pdf_path).name
