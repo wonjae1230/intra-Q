@@ -4,8 +4,8 @@ import re
 from typing import Any
 
 
-def split_text_into_chunks(text: str, min_size: int = 300, max_size: int = 500, target_size: int = 400) -> list[str]:
-    """Split text into chunks sized around 300~500 characters.
+def split_text_into_chunks(text: str, min_size: int = 600, max_size: int = 1000, target_size: int = 800) -> list[str]:
+    """Split text into chunks sized around 600~1000 characters.
 
     The splitter prefers paragraph, sentence, or whitespace boundaries first.
     If no natural break exists, it falls back to a hard character boundary and

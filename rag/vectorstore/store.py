@@ -46,7 +46,10 @@ class ChromaVectorStore:
         self.persist_dir = persist_dir or config.chroma_persist_dir
         self.collection_name = collection_name or config.chroma_collection_name
         self._client = chromadb.PersistentClient(path=self.persist_dir)
-        self._collection = self._client.get_or_create_collection(name=self.collection_name)
+        self._collection = self._client.get_or_create_collection(
+            name=self.collection_name,
+            metadata={"hnsw:space": config.chroma_distance_metric},
+        )
 
     def upsert_chunks(
         self,
