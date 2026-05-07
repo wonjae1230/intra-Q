@@ -1,25 +1,22 @@
-"""Text embedding helpers backed by Gemini embeddings."""
+"""Text embedding helpers backed by OpenAI embeddings."""
 
 from __future__ import annotations
 
 from functools import lru_cache
 from typing import Iterable
 
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 
 from rag.config import get_config
 
 
-class GeminiTextEmbedder:
+class OpenAITextEmbedder:
     """Convert Korean or English text chunks into embedding vectors."""
 
     def __init__(self, model: str | None = None) -> None:
         config = get_config()
         self.model = model or config.embedding_model
-        self._client = GoogleGenerativeAIEmbeddings(
-            model=self.model,
-            output_dimensionality=config.embedding_output_dimensionality,
-        )
+        self._client = OpenAIEmbeddings(model=self.model)
 
     def embed_text(self, text: str) -> list[float]:
         if not text or not text.strip():
@@ -34,8 +31,8 @@ class GeminiTextEmbedder:
 
 
 @lru_cache(maxsize=1)
-def _default_embedder() -> GeminiTextEmbedder:
-    return GeminiTextEmbedder()
+def _default_embedder() -> OpenAITextEmbedder:
+    return OpenAITextEmbedder()
 
 
 def embed_text(text: str) -> list[float]:

@@ -67,6 +67,7 @@ export default function DocumentUploadPage() {
       pdfFiles.map(async (file, index) => {
         const response = await uploadDocument(file);
         const data = response?.data || {};
+        const embeddingOk = data.embedding_status === "success";
         return {
           tempId: placeholders[index].tempId,
           id: data.document_id ?? placeholders[index].tempId,
@@ -75,7 +76,7 @@ export default function DocumentUploadPage() {
           uploadedTime: "방금",
           pages: data.page_count ?? "-",
           chunks: data.chunk_count ?? "-",
-          status: "처리 완료",
+          status: embeddingOk ? "처리 완료" : "임베딩 실패",
           progress: 100,
         };
       })
@@ -206,7 +207,7 @@ export default function DocumentUploadPage() {
             <div className="flex flex-col gap-3.5 overflow-y-auto pr-1">
               {documents.map((doc) => (
                 <article
-                  key={doc.id}
+                  key={doc.tempId}
                   className="rounded-[18px] border border-slate-200 bg-slate-50 p-[18px]"
                 >
                   <div className="mb-3.5 flex items-center gap-3">
@@ -245,7 +246,8 @@ export default function DocumentUploadPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/documents")}
-                  className="h-[42px] flex-1 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  disabled={isUploading}
+                  className="h-[42px] flex-1 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   문서 관리로 이동
                 </button>
@@ -253,9 +255,10 @@ export default function DocumentUploadPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/chat")}
-                  className="h-[42px] flex-1 rounded-xl bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700"
+                  disabled={isUploading}
+                  className="h-[42px] flex-1 rounded-xl bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  질문하러 가기
+                  {isUploading ? "처리 중..." : "질문하러 가기"}
                 </button>
               </div>
             </div>
