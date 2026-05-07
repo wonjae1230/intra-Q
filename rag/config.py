@@ -28,7 +28,7 @@ class RagConfig:
     embedding_model: str = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
     chat_model: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
     gemini_thinking_budget: int = int(os.getenv("GEMINI_THINKING_BUDGET", "0"))
-    top_k: int = int(os.getenv("RAG_TOP_K", "4"))
+    top_k: int = int(os.getenv("RAG_TOP_K", "8"))
     distance_threshold: float = float(os.getenv("RAG_DISTANCE_THRESHOLD", "1.2"))
 
 

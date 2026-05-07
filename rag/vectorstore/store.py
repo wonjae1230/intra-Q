@@ -81,12 +81,22 @@ class ChromaVectorStore:
         embedding: list[float],
         top_k: int = 4,
         distance_threshold: float | None = None,
+        where: dict | None = None,
     ) -> list[SearchResult]:
-        raw = self._collection.query(
-            query_embeddings=[embedding],
-            n_results=top_k,
-            include=["documents", "metadatas", "distances"],
-        )
+        total = self._collection.count()
+        if total == 0:
+            return []
+        n_results = min(top_k, total)
+
+        query_kwargs: dict = {
+            "query_embeddings": [embedding],
+            "n_results": n_results,
+            "include": ["documents", "metadatas", "distances"],
+        }
+        if where:
+            query_kwargs["where"] = where
+
+        raw = self._collection.query(**query_kwargs)
 
         documents = raw.get("documents", [[]])[0]
         metadatas = raw.get("metadatas", [[]])[0]

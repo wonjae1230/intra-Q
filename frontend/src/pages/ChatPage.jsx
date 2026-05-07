@@ -305,6 +305,21 @@ export default function ChatPage() {
                   </div>
                 );
               })}
+
+              {isSending && (
+                <div className="flex gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 font-mono text-[13px] font-extrabold text-white">
+                    AI
+                  </div>
+                  <div className="flex items-center rounded-[18px] rounded-bl border border-slate-200 bg-slate-50 px-[18px] py-4">
+                    <span className="flex gap-1">
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3">
