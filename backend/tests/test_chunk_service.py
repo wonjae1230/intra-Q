@@ -8,8 +8,8 @@ def test_split_text_into_chunks_keeps_chunk_sizes_reasonable() -> None:
 
     assert chunks
     for chunk in chunks[:-1]:
-        assert 300 <= len(chunk) <= 500
-    assert len(chunks[-1]) <= 500
+        assert 600 <= len(chunk) <= 1000
+    assert len(chunks[-1]) <= 1000
 
 
 def test_build_page_chunks_keeps_page_number() -> None:
