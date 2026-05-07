@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from rag.config import get_config
-from rag.embeddings.embedder import GeminiTextEmbedder
+from rag.embeddings.embedder import OpenAITextEmbedder
 from rag.vectorstore.store import ChromaVectorStore, SearchResult
 
 
 class Retriever:
     def __init__(
         self,
-        embedder: GeminiTextEmbedder | None = None,
+        embedder: OpenAITextEmbedder | None = None,
         store: ChromaVectorStore | None = None,
     ) -> None:
-        self.embedder = embedder or GeminiTextEmbedder()
+        self.embedder = embedder or OpenAITextEmbedder()
         self.store = store or ChromaVectorStore()
 
     def retrieve(

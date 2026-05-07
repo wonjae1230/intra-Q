@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from rag.config import get_config
-from rag.embeddings.embedder import GeminiTextEmbedder
+from rag.embeddings.embedder import OpenAITextEmbedder
 from rag.generator.generator import AnswerGenerator
 from rag.retriever.retriever import Retriever
 from rag.vectorstore.store import ChromaVectorStore
@@ -22,7 +22,7 @@ def embed_chunks(chunks: list[Chunk]) -> dict[str, Any]:
     """
 
     _validate_chunks(chunks)
-    embedder = GeminiTextEmbedder()
+    embedder = OpenAITextEmbedder()
     store = ChromaVectorStore()
     embeddings = embedder.embed_texts([chunk["content"] for chunk in chunks])
     ids = store.upsert_chunks(chunks, embeddings)
