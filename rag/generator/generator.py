@@ -20,7 +20,9 @@ class AnswerGenerator:
         self._client = ChatGoogleGenerativeAI(
             model=self.model,
             temperature=temperature,
-            thinking_budget=config.gemini_thinking_budget,
+            vertexai=True,
+            project=config.google_cloud_project,
+            location=config.vertex_ai_location,
         )
 
     def generate(self, question: str, chunks: list[Source]) -> dict[str, Any]:
