@@ -6,4 +6,5 @@ rag/chroma_db/
 chroma_db/
 .env
 rag/.env
+backend/intra_q.db
 
