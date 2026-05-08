@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database.init_db import init_db
+from app.routers.auth import router as auth_router
 from app.routers.chat import router as chat_router
 from app.routers.chat_history import router as chat_history_router
 from app.routers.documents import router as documents_router
@@ -47,6 +48,7 @@ def health_check() -> HealthResponse:
     return HealthResponse(status="ok")
 
 
+app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
 app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 app.include_router(chat_history_router, prefix="/api/chat/history", tags=["chat-history"])

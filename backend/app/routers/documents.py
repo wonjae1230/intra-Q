@@ -9,9 +9,11 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from sqlalchemy.orm import Session
 
+from app.core.dependencies import get_current_user
 from app.database.session import get_db
 from app.models.chunk import Chunk
 from app.models.document import Document
+from app.models.user import User
 from app.schemas.documents import (
     DocumentChunkItem,
     DocumentDeleteData,
@@ -52,9 +54,18 @@ def extract_pdf_pages(pdf_bytes: bytes) -> list[dict[str, Any]]:
     summary="Upload a PDF document",
     description="Upload a PDF file, extract text page by page, split into chunks, and store the document and chunks in SQLite.",
 )
-async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)) -> DocumentUploadResponse:
+async def upload_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DocumentUploadResponse:
     """Upload a PDF, extract its text, split it into chunks, and persist everything."""
-    logger.info("Upload request received: filename=%s, content_type=%s", file.filename, file.content_type)
+    logger.info(
+        "Upload request received: user_id=%s, filename=%s, content_type=%s",
+        current_user.id,
+        file.filename,
+        file.content_type,
+    )
     is_pdf_content_type = file.content_type == "application/pdf"
     is_pdf_extension = (file.filename or "").lower().endswith(".pdf")
 
@@ -69,6 +80,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
 
         # Persist the document first so chunk rows can reference its id.
         document_row = Document(
+            user_id=current_user.id,
             file_name=file.filename or "unknown.pdf",
             page_count=len(pages),
         )
@@ -123,7 +135,13 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         embedding_message = "RAG embedding failed; document stored in SQLite only."
         logger.error("RAG embedding failed: document_id=%s, error=%s", document_row.id, exc, exc_info=True)
 
-    logger.info("Upload succeeded: document_id=%s, filename=%s, chunks=%s", document_row.id, document_row.file_name, len(chunks))
+    logger.info(
+        "Upload succeeded: user_id=%s, document_id=%s, filename=%s, chunks=%s",
+        current_user.id,
+        document_row.id,
+        document_row.file_name,
+        len(chunks),
+    )
     return DocumentUploadResponse(
         message="Document uploaded successfully",
         data=DocumentUploadData(
@@ -143,7 +161,10 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
     summary="List uploaded documents",
     description="Return all uploaded documents ordered by latest upload first, including chunk counts for the frontend list view.",
 )
-def list_documents(db: Session = Depends(get_db)) -> DocumentListResponse:
+def list_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DocumentListResponse:
     """Return the uploaded document list for the frontend management screen."""
     try:
         rows = (
@@ -155,6 +176,7 @@ def list_documents(db: Session = Depends(get_db)) -> DocumentListResponse:
                 func.count(Chunk.id).label("chunk_count"),
             )
             .outerjoin(Chunk, Chunk.document_id == Document.id)
+            .filter(Document.user_id == current_user.id)
             .group_by(Document.id, Document.file_name, Document.page_count, Document.uploaded_at)
             .order_by(Document.uploaded_at.desc(), Document.id.desc())
             .all()
@@ -163,6 +185,7 @@ def list_documents(db: Session = Depends(get_db)) -> DocumentListResponse:
         logger.error("List documents DB error: %s", exc, exc_info=True)
         raise HTTPException(status_code=503, detail="DB 연결 실패") from exc
 
+    logger.info("User documents retrieved: user_id=%s, rows=%s", current_user.id, len(rows))
     return DocumentListResponse(
         message="Documents retrieved successfully",
         data=[
@@ -185,7 +208,11 @@ def list_documents(db: Session = Depends(get_db)) -> DocumentListResponse:
     summary="Get a document with chunk previews",
     description="Return one stored document and its chunk previews for debugging and frontend display.",
 )
-def get_document(document_id: int, db: Session = Depends(get_db)) -> DocumentDetailResponse:
+def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DocumentDetailResponse:
     """Return document metadata and its chunks from the database."""
     try:
         document = db.query(Document).filter(Document.id == document_id).first()
@@ -196,6 +223,15 @@ def get_document(document_id: int, db: Session = Depends(get_db)) -> DocumentDet
     if not document:
         logger.info("Document not found: document_id=%s", document_id)
         raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
+
+    if document.user_id != current_user.id:
+        logger.warning(
+            "Unauthorized document access attempt: user_id=%s, document_id=%s, owner_user_id=%s",
+            current_user.id,
+            document_id,
+            document.user_id,
+        )
+        raise HTTPException(status_code=403, detail="해당 문서에 접근할 권한이 없습니다.")
 
     try:
         chunks = (
@@ -236,9 +272,13 @@ def get_document(document_id: int, db: Session = Depends(get_db)) -> DocumentDet
     summary="Delete a document and its chunks",
     description="Delete the selected document and all related chunks from SQLite. The response includes the number of deleted chunks.",
 )
-def delete_document(document_id: int, db: Session = Depends(get_db)) -> DocumentDeleteResponse:
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DocumentDeleteResponse:
     """Delete a document and its related chunks in a transaction-safe order."""
-    logger.info("Delete request received: document_id=%s", document_id)
+    logger.info("Delete request received: user_id=%s, document_id=%s", current_user.id, document_id)
 
     try:
         document = db.query(Document).filter(Document.id == document_id).first()
@@ -249,6 +289,15 @@ def delete_document(document_id: int, db: Session = Depends(get_db)) -> Document
     if not document:
         logger.info("Delete request for missing document: document_id=%s", document_id)
         raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
+
+    if document.user_id != current_user.id:
+        logger.warning(
+            "Unauthorized document delete attempt: user_id=%s, document_id=%s, owner_user_id=%s",
+            current_user.id,
+            document_id,
+            document.user_id,
+        )
+        raise HTTPException(status_code=403, detail="해당 문서에 접근할 권한이 없습니다.")
 
     deleted_document_id = document.id
 
