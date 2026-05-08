@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { setAuthenticated } from "../lib/auth";
+
 function IntraQIllustration() {
   return (
     <div className="relative h-[220px] w-[360px] rounded-[28px] border border-slate-200 bg-slate-50">
@@ -57,6 +59,12 @@ export function LoginPage() {
     event.preventDefault();
 
     // TODO: 백엔드 로그인 API 연결 예정
+    setAuthenticated(true);
+    navigate("/");
+  };
+
+  const handleDemoLogin = () => {
+    setAuthenticated(true);
     navigate("/");
   };
 
@@ -123,7 +131,7 @@ export function LoginPage() {
 
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={handleDemoLogin}
             className="mt-3 h-[42px] w-full rounded-[14px] border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             샘플 계정으로 체험하기

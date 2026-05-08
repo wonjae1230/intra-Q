@@ -1,5 +1,8 @@
 import { useNavigate } from "react-router-dom";
 
+import { AppLayout, PageShell } from "../components/ui";
+import { isAuthenticated } from "../lib/auth";
+
 const steps = [
   {
     number: "1",
@@ -77,49 +80,11 @@ function StepCard({ number, title, description }) {
 
 export default function EmptyStatePage() {
   const navigate = useNavigate();
+  const authenticated = isAuthenticated();
 
   return (
-    <main className="min-h-screen bg-white p-6 font-sans text-slate-950">
-      <nav className="mb-8 flex h-14 items-center gap-2.5 rounded-[18px] border border-slate-200 bg-white px-4">
-        <button
-          type="button"
-          onClick={() => navigate("/")}
-          className="flex items-center gap-2"
-        >
-          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-blue-600 font-mono text-base font-extrabold text-white">
-            Q
-          </span>
-          <span className="text-base font-extrabold">Intra-Q</span>
-        </button>
-
-        <div className="flex-1" />
-
-        <button
-          type="button"
-          onClick={() => navigate("/upload")}
-          className="h-9 rounded-[10px] px-3.5 text-sm font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-        >
-          문서 업로드
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate("/documents")}
-          className="h-9 rounded-[10px] px-3.5 text-sm font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-        >
-          문서 관리
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate("/chat")}
-          className="h-9 rounded-[10px] px-3.5 text-sm font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-        >
-          챗봇
-        </button>
-      </nav>
-
-      <div className="mx-auto flex min-h-[calc(100vh-136px)] max-w-[1000px] flex-col items-center justify-center gap-6">
+    <AppLayout>
+      <PageShell className="items-center justify-center">
         <Illustration />
 
         <section className="text-center">
@@ -146,21 +111,21 @@ export default function EmptyStatePage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate("/upload")}
+            onClick={() => navigate(authenticated ? "/upload" : "/login")}
             className="h-[50px] rounded-[14px] bg-blue-600 px-5 text-[15px] font-bold text-white transition hover:bg-blue-700"
           >
-            문서 업로드 시작하기
+            {authenticated ? "문서 업로드 시작하기" : "로그인하고 시작하기"}
           </button>
 
           <button
             type="button"
-            onClick={() => navigate("/chat")}
+            onClick={() => navigate(authenticated ? "/chat" : "/signup")}
             className="h-[50px] rounded-[14px] border border-slate-300 bg-white px-5 text-[15px] font-bold text-slate-700 transition hover:bg-slate-50"
           >
-            샘플 문서로 체험하기
+            {authenticated ? "샘플 문서로 체험하기" : "회원가입"}
           </button>
         </div>
-      </div>
-    </main>
+      </PageShell>
+    </AppLayout>
   );
 }

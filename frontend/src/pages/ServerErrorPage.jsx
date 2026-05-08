@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
-import { AppLayout } from "../components/ui";
+import { AppLayout, PageShell } from "../components/ui";
 import ErrorStateCard from "../components/ErrorStateCard";
 
 export default function ServerErrorPage() {
@@ -8,7 +8,7 @@ export default function ServerErrorPage() {
 
   return (
     <AppLayout>
-      <div className="mx-auto flex min-h-[calc(100vh-136px)] max-w-[1200px] flex-col items-center justify-center">
+      <PageShell className="items-center justify-center">
         <ErrorStateCard
           type="server-error"
           title="요청을 처리하지 못했습니다"
@@ -23,7 +23,7 @@ export default function ServerErrorPage() {
           onPrimaryClick={() => navigate("/chat")}
           onSecondaryClick={() => navigate("/upload")}
         />
-      </div>
+      </PageShell>
     </AppLayout>
   );
 }
