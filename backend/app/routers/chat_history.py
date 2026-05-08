@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.dependencies import get_current_user
 from app.database.session import get_db
+from app.models.user import User
 from app.schemas.chat_history import ChatHistoryDeleteData, ChatHistoryDeleteResponse, ChatHistoryResponse
 from app.services.chat_history_service import delete_chat_history, list_chat_history
 
@@ -27,9 +29,11 @@ def get_chat_history(
     offset: int = Query(default=0, ge=0, description="조회 시작 위치"),
     order: Literal["asc", "desc"] = Query(default="asc", description="정렬 방향"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ChatHistoryResponse:
     try:
-        history = list_chat_history(db, limit=limit, offset=offset, order=order)
+        history = list_chat_history(db, user_id=current_user.id, limit=limit, offset=offset, order=order)
+        logger.info("User chat history retrieved: user_id=%s, rows=%s", current_user.id, len(history))
         return ChatHistoryResponse(message="Chat history retrieved successfully", data=history)
     except SQLAlchemyError as exc:
         logger.error("Chat history query DB error: %s", exc, exc_info=True)
@@ -47,10 +51,13 @@ def get_chat_history(
     summary="Delete chat history",
     description="Delete all stored chat messages so the frontend can reset the conversation state.",
 )
-def clear_chat_history(db: Session = Depends(get_db)) -> ChatHistoryDeleteResponse:
-    logger.info("Chat history delete request received")
+def clear_chat_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ChatHistoryDeleteResponse:
+    logger.info("Chat history delete request received: user_id=%s", current_user.id)
     try:
-        deleted_count = delete_chat_history(db)
+        deleted_count = delete_chat_history(db, user_id=current_user.id)
         return ChatHistoryDeleteResponse(
             message="Chat history deleted successfully",
             data=ChatHistoryDeleteData(deleted_count=deleted_count),

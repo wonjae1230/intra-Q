@@ -86,6 +86,7 @@ def _to_response_model(message: ChatMessage) -> ChatMessageResponse:
 
 def save_chat_message(
     db: Session,
+    user_id: int,
     role: ChatRole,
     content: str,
     document_ids: list[int] | None = None,
@@ -95,6 +96,7 @@ def save_chat_message(
 
     cleaned_content, content_length = _prepare_content_for_role(role, content)
     message_row = ChatMessage(
+        user_id=user_id,
         role=role,
         content=cleaned_content,
         content_length=content_length,
@@ -121,21 +123,23 @@ def save_chat_message(
     return message_row
 
 
-def save_user_message(db: Session, content: str, document_ids: list[int] | None = None) -> ChatMessage:
-    return save_chat_message(db, "user", content, document_ids=document_ids, latency_ms=None)
+def save_user_message(db: Session, user_id: int, content: str, document_ids: list[int] | None = None) -> ChatMessage:
+    return save_chat_message(db, user_id, "user", content, document_ids=document_ids, latency_ms=None)
 
 
 def save_assistant_message(
     db: Session,
+    user_id: int,
     content: str,
     document_ids: list[int] | None = None,
     latency_ms: int | None = None,
 ) -> ChatMessage:
-    return save_chat_message(db, "assistant", content, document_ids=document_ids, latency_ms=latency_ms)
+    return save_chat_message(db, user_id, "assistant", content, document_ids=document_ids, latency_ms=latency_ms)
 
 
 def list_chat_history(
     db: Session,
+    user_id: int,
     limit: int = 50,
     offset: int = 0,
     order: Literal["asc", "desc"] = "asc",
@@ -146,25 +150,33 @@ def list_chat_history(
     secondary_order = ChatMessage.id.asc() if order == "asc" else ChatMessage.id.desc()
     rows = (
         db.query(ChatMessage)
+        .filter(ChatMessage.user_id == user_id)
         .order_by(sort_order, secondary_order)
         .offset(offset)
         .limit(limit)
         .all()
     )
-    logger.info("Chat history retrieved: limit=%s, offset=%s, order=%s, rows=%s", limit, offset, order, len(rows))
+    logger.info(
+        "Chat history retrieved: user_id=%s, limit=%s, offset=%s, order=%s, rows=%s",
+        user_id,
+        limit,
+        offset,
+        order,
+        len(rows),
+    )
     return [_to_response_model(row) for row in rows]
 
 
-def delete_chat_history(db: Session) -> int:
+def delete_chat_history(db: Session, user_id: int) -> int:
     """Delete all stored chat messages and return the affected row count."""
 
     try:
-        deleted_count = db.query(ChatMessage).delete(synchronize_session=False)
+        deleted_count = db.query(ChatMessage).filter(ChatMessage.user_id == user_id).delete(synchronize_session=False)
         db.commit()
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Chat history delete failed: %s", exc, exc_info=True)
         raise
 
-    logger.info("Chat history deleted: deleted_count=%s", deleted_count)
+    logger.info("Chat history deleted: user_id=%s, deleted_count=%s", user_id, deleted_count)
     return int(deleted_count)

@@ -63,6 +63,13 @@ def generate_chat_response(
     if not cleaned_question:
         raise ValueError("질문은 비어 있을 수 없습니다.")
 
+    if document_ids == []:
+        return ChatData(
+            answer="현재 사용자의 검색 가능한 문서가 없습니다. 먼저 PDF 문서를 업로드해 주세요.",
+            sources=[],
+            latency_ms=max(1, int((time.perf_counter() - started_at) * 1000)),
+        )
+
     if document_ids is not None:
         logger.info("Chat document filter requested: document_ids=%s", document_ids)
 
