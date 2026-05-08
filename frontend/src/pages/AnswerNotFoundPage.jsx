@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
-import { AppLayout } from "../components/ui";
+import { AppLayout, PageShell } from "../components/ui";
 import ErrorStateCard from "../components/ErrorStateCard";
 
 export default function AnswerNotFoundPage() {
@@ -8,7 +8,7 @@ export default function AnswerNotFoundPage() {
 
   return (
     <AppLayout>
-      <div className="mx-auto flex min-h-[calc(100vh-136px)] max-w-[1200px] flex-col items-center justify-center">
+      <PageShell className="items-center justify-center">
         <ErrorStateCard
           type="not-found"
           title="문서에서 답을 찾을 수 없습니다"
@@ -23,7 +23,7 @@ export default function AnswerNotFoundPage() {
           onPrimaryClick={() => navigate("/chat")}
           onSecondaryClick={() => navigate("/documents")}
         />
-      </div>
+      </PageShell>
     </AppLayout>
   );
 }

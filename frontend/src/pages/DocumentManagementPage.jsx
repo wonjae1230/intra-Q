@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { documents as initialDocuments } from "../data/mockData";
-import { ActionButton, AppLayout, PdfIcon, StatusBadge } from "../components/ui";
+import {
+  ActionButton,
+  AppLayout,
+  PageHeader,
+  PageShell,
+  Panel,
+  PdfIcon,
+  StatusBadge,
+} from "../components/ui";
 import { deleteDocument, getDocuments } from "../lib/api";
 
 const USE_MOCK_FALLBACK = false;
@@ -84,17 +92,11 @@ export default function DocumentManagementPage() {
 
   return (
     <AppLayout>
-      <div className="mx-auto flex min-h-[calc(100vh-136px)] max-w-[1296px] flex-col gap-6">
-        <header className="flex items-center gap-5">
-          <div className="flex-1">
-            <h1 className="text-[34px] font-bold tracking-normal">
-              문서 관리
-            </h1>
-            <p className="mt-2 text-[15px] text-slate-500">
-              업로드된 문서를 확인하고 질문에 사용할 문서를 관리하세요.
-            </p>
-          </div>
-
+      <PageShell>
+        <PageHeader
+          title="문서 관리"
+          description="업로드된 문서를 확인하고 질문에 사용할 문서를 관리하세요."
+          action={
           <button
             type="button"
             onClick={() => navigate("/upload")}
@@ -102,9 +104,10 @@ export default function DocumentManagementPage() {
           >
             새 문서 업로드
           </button>
-        </header>
+          }
+        />
 
-        <section className="flex items-center gap-3.5 rounded-[20px] border border-slate-200 bg-white p-4">
+        <Panel className="flex items-center gap-3.5 p-4">
           <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-[14px] border border-slate-300 bg-slate-50 px-4">
             <span className="font-mono text-lg font-bold text-slate-500">
               ⌕
@@ -138,9 +141,9 @@ export default function DocumentManagementPage() {
               );
             })}
           </div>
-        </section>
+        </Panel>
 
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
+        <Panel className="overflow-hidden">
           <div className="grid h-[54px] grid-cols-[360px_170px_100px_100px_140px_1fr] items-center gap-3 bg-slate-50 px-[18px] text-xs font-bold text-slate-500">
             <div>문서명</div>
             <div>업로드 날짜</div>
@@ -215,11 +218,13 @@ export default function DocumentManagementPage() {
               <p className="text-sm font-bold text-slate-700">
                 검색 결과가 없습니다.
               </p>
-              <p className="text-xs text-slate-500">{loadError || "다른 문서명으로 검색하거나 필터를 변경해보세요."}</p>
+              <p className="text-xs text-slate-500">
+                {loadError || "다른 문서명으로 검색하거나 필터를 변경해보세요."}
+              </p>
             </div>
           )}
-        </section>
-      </div>
+        </Panel>
+      </PageShell>
     </AppLayout>
   );
 }

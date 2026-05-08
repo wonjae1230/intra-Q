@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { pageSources } from "../data/mockData";
-import { AppLayout } from "../components/ui";
+import { AppLayout, PageHeader, PageShell, Panel } from "../components/ui";
 
 const documentInfo = {
   name: "인사규정.pdf",
@@ -62,9 +62,18 @@ export default function DocumentDetailPage() {
 
   return (
     <AppLayout>
-      <div className="mx-auto flex min-h-[calc(100vh-136px)] max-w-[1296px] flex-col gap-[22px]">
-        <header className="flex items-center gap-5">
-          <div className="flex-1">
+      <PageShell>
+        <PageHeader
+          title="문서 상세 보기"
+          description={documentInfo.name}
+          action={
+            <div className="flex justify-end gap-2">
+              {meta.map((item) => (
+                <MetaPill key={item}>{item}</MetaPill>
+              ))}
+            </div>
+          }
+        >
             <button
               type="button"
               onClick={() => navigate("/documents")}
@@ -72,24 +81,10 @@ export default function DocumentDetailPage() {
             >
               ← 문서 관리로 돌아가기
             </button>
-
-            <h1 className="text-[34px] font-bold tracking-normal">
-              문서 상세 보기
-            </h1>
-            <p className="mt-2 text-base font-bold text-blue-600">
-              {documentInfo.name}
-            </p>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            {meta.map((item) => (
-              <MetaPill key={item}>{item}</MetaPill>
-            ))}
-          </div>
-        </header>
+        </PageHeader>
 
         <div className="flex flex-1 gap-6">
-          <section className="flex flex-1 flex-col gap-3.5 rounded-3xl border border-slate-200 bg-white p-[18px]">
+          <Panel className="flex flex-1 flex-col gap-3.5 p-[18px]">
             <div className="flex h-11 items-center gap-2.5">
               <span className="rounded-full bg-blue-50 px-3 py-1.5 font-mono text-xs font-bold text-blue-600">
                 Page {selectedSource.page} selected
@@ -146,9 +141,9 @@ export default function DocumentDetailPage() {
                 </div>
               </div>
             </div>
-          </section>
+          </Panel>
 
-          <aside className="flex w-[390px] flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5">
+          <Panel as="aside" className="flex w-[390px] flex-col gap-4 p-5">
             <h2 className="text-xl font-bold">출처 정보</h2>
 
             <section className="rounded-2xl border border-blue-200 bg-blue-50 p-3.5">
@@ -195,9 +190,9 @@ export default function DocumentDetailPage() {
             >
               이 문서로 질문하기
             </button>
-          </aside>
+          </Panel>
         </div>
-      </div>
+      </PageShell>
     </AppLayout>
   );
 }

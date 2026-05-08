@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { AppLayout, PdfIcon, StatusBadge } from "../components/ui";
+import {
+  AppLayout,
+  PageShell,
+  Panel,
+  PdfIcon,
+  StatusBadge,
+} from "../components/ui";
 import { askQuestion, getDocuments } from "../lib/api";
 
 function mapDocumentFromApi(item) {
@@ -147,8 +153,8 @@ export default function ChatPage() {
 
   return (
     <AppLayout>
-      <div className="mx-auto flex min-h-[calc(100vh-136px)] max-w-[1392px] gap-6">
-        <aside className="flex w-[360px] flex-col gap-5 rounded-3xl border border-slate-200 bg-white p-5">
+      <PageShell direction="row">
+        <Panel as="aside" className="flex w-[340px] shrink-0 flex-col gap-5 p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 font-mono text-[22px] font-extrabold text-white">
               Q
@@ -227,7 +233,7 @@ export default function ChatPage() {
               </p>
             )}
           </div>
-        </aside>
+        </Panel>
 
         <section className="flex flex-1 flex-col gap-[18px]">
           <header className="flex items-center gap-4 px-0.5 py-1">
@@ -243,7 +249,7 @@ export default function ChatPage() {
             </span>
           </header>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-[18px] rounded-3xl border border-slate-200 bg-white p-6">
+          <Panel className="flex min-h-0 flex-1 flex-col gap-[18px] p-6">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
               <p className="text-sm font-bold">현재 대화</p>
               <p className="text-xs text-slate-500">
@@ -388,9 +394,9 @@ export default function ChatPage() {
                 서버 오류 화면 확인
               </button>
             </div>
-          </div>
+          </Panel>
         </section>
-      </div>
+      </PageShell>
     </AppLayout>
   );
 }

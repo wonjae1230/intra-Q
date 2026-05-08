@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 
-import { setAuthenticated } from "../router";
+import { isAuthenticated, setAuthenticated } from "../lib/auth";
 
 export function PdfIcon({ size = "md" }) {
   const className =
@@ -61,8 +61,51 @@ export function ActionButton({
   );
 }
 
+export function PageShell({ children, className = "", direction = "column" }) {
+  const directionClass = direction === "row" ? "flex-row" : "flex-col";
+
+  return (
+    <div
+      className={`mx-auto flex min-h-[calc(100vh-136px)] w-full max-w-[1296px] ${directionClass} gap-6 ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function PageHeader({ title, description, action, children }) {
+  return (
+    <header className="flex min-h-14 items-center gap-5">
+      <div className="min-w-0 flex-1">
+        {children}
+        <h1 className="text-[34px] font-bold tracking-normal text-slate-950">
+          {title}
+        </h1>
+        {description && (
+          <p className="mt-2 text-[15px] leading-relaxed text-slate-500">
+            {description}
+          </p>
+        )}
+      </div>
+
+      {action}
+    </header>
+  );
+}
+
+export function Panel({ children, className = "", as: Component = "section" }) {
+  return (
+    <Component
+      className={`rounded-[20px] border border-slate-200 bg-white ${className}`}
+    >
+      {children}
+    </Component>
+  );
+}
+
 export function AppLayout({ children }) {
   const navigate = useNavigate();
+  const authenticated = isAuthenticated();
 
   const navItems = [
     { to: "/upload", label: "문서 업로드" },
@@ -103,30 +146,50 @@ export function AppLayout({ children }) {
           </NavLink>
         ))}
 
-        <div className="ml-3 flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
-            D
+        {authenticated ? (
+          <div className="ml-3 flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+              D
+            </div>
+
+            <span className="text-sm font-semibold text-slate-700">
+              Demo User
+            </span>
+
+            <button
+              type="button"
+              className="text-xs font-semibold text-slate-500 hover:text-blue-600"
+            >
+              내 정보
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="text-xs font-semibold text-red-500 hover:text-red-600"
+            >
+              로그아웃
+            </button>
           </div>
+        ) : (
+          <div className="ml-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/login")}
+              className="h-9 rounded-[10px] border border-slate-300 bg-white px-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              로그인
+            </button>
 
-          <span className="text-sm font-semibold text-slate-700">
-            Demo User
-          </span>
-
-          <button
-            type="button"
-            className="text-xs font-semibold text-slate-500 hover:text-blue-600"
-          >
-            내 정보
-          </button>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="text-xs font-semibold text-red-500 hover:text-red-600"
-          >
-            로그아웃
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => navigate("/signup")}
+              className="h-9 rounded-[10px] bg-blue-600 px-3.5 text-sm font-bold text-white transition hover:bg-blue-700"
+            >
+              회원가입
+            </button>
+          </div>
+        )}
       </nav>
 
       {children}
