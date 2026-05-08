@@ -99,11 +99,14 @@ export default function ChatPage() {
         trimmedQuestion,
         activeDocuments.map((doc) => doc.id)
       );
+
       await minLoadingDelay;
+
       const chatData = response?.data ?? response ?? {};
       const sources = Array.isArray(chatData.sources)
         ? chatData.sources.map(mapSourceFromApi)
         : [];
+
       const firstSource = sources[0];
 
       setMessages((prevMessages) => [
@@ -120,6 +123,7 @@ export default function ChatPage() {
       ]);
     } catch (error) {
       await minLoadingDelay;
+
       setMessages((prevMessages) => [
         ...prevMessages,
         {
@@ -341,6 +345,7 @@ export default function ChatPage() {
                   </div>
                 </div>
               )}
+
               <div ref={messageEndRef} />
             </div>
 
