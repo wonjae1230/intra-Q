@@ -1,5 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 
+import { setAuthenticated } from "../router";
+
 export function PdfIcon({ size = "md" }) {
   const className =
     size === "lg"
@@ -68,6 +70,11 @@ export function AppLayout({ children }) {
     { to: "/chat", label: "챗봇" },
   ];
 
+  const handleLogout = () => {
+    setAuthenticated(false);
+    navigate("/login");
+  };
+
   return (
     <main className="min-h-screen bg-[#F8FAFC] p-6 font-sans text-slate-950">
       <nav className="mb-8 flex h-14 items-center gap-2.5 rounded-[18px] border border-slate-200 bg-white px-4">
@@ -114,7 +121,7 @@ export function AppLayout({ children }) {
 
           <button
             type="button"
-            onClick={() => navigate("/login")}
+            onClick={handleLogout}
             className="text-xs font-semibold text-red-500 hover:text-red-600"
           >
             로그아웃
