@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { login, register } from "../lib/api";
 
 function IntraQIllustration() {
   return (
@@ -52,12 +53,21 @@ export function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (event) => {
+  const handleLogin = async (event) => {
     event.preventDefault();
-
-    // TODO: 백엔드 로그인 API 연결 예정
-    navigate("/");
+    setError("");
+    setLoading(true);
+    try {
+      await login(email, password);
+      navigate("/");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -114,11 +124,16 @@ export function LoginPage() {
             </button>
           </div>
 
+          {error && (
+            <p className="mt-3 text-sm text-red-500">{error}</p>
+          )}
+
           <button
             type="submit"
-            className="mt-3 h-11 w-full rounded-[14px] bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700"
+            disabled={loading}
+            className="mt-3 h-11 w-full rounded-[14px] bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
           >
-            로그인
+            {loading ? "로그인 중..." : "로그인"}
           </button>
 
           <button
@@ -154,6 +169,8 @@ export function SignupPage() {
     email: "",
     password: "",
   });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (field, value) => {
     setForm((prevForm) => ({
@@ -162,11 +179,18 @@ export function SignupPage() {
     }));
   };
 
-  const handleSignup = (event) => {
+  const handleSignup = async (event) => {
     event.preventDefault();
-
-    // TODO: 백엔드 회원가입 API 연결 예정
-    navigate("/login");
+    setError("");
+    setLoading(true);
+    try {
+      await register(form.email, form.password, form.name);
+      navigate("/login");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -246,11 +270,16 @@ export function SignupPage() {
             </label>
           </div>
 
+          {error && (
+            <p className="mt-3 text-sm text-red-500">{error}</p>
+          )}
+
           <button
             type="submit"
-            className="mt-4 h-[42px] w-full rounded-[14px] bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700"
+            disabled={loading}
+            className="mt-4 h-[42px] w-full rounded-[14px] bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
           >
-            회원가입
+            {loading ? "가입 중..." : "회원가입"}
           </button>
 
           <div className="mt-3 flex items-center justify-center gap-1.5 text-xs">
