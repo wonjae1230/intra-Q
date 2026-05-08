@@ -49,7 +49,7 @@ def query(
         fetch_k = final_top_k * config.reranker_fetch_multiplier
         chunks = retriever.retrieve(question, top_k=fetch_k, document_ids=document_ids)
         reranker = VertexAIReranker()
-        chunks = reranker.rerank(question, chunks, top_n=final_top_k)
+        chunks = reranker.rerank(question, chunks, top_n=config.reranker_top_n)
     else:
         chunks = retriever.retrieve(question, top_k=final_top_k, document_ids=document_ids)
 
