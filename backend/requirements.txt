@@ -14,4 +14,4 @@ langchain-google-genai
 langchain-community
 langchain-chroma
 chromadb
-openai
+openai>=1.0.0,<2.0.0
