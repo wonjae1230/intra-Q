@@ -64,12 +64,17 @@ export function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      setAuthenticated(true);
       navigate("/");
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDemoLogin = () => {
+    navigate("/");
   };
 
   return (
