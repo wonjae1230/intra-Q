@@ -10,3 +10,4 @@ rag/.env
 *.db
 backend/intra_q.db
 .DS_Store
+repomix-output.xml
