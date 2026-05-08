@@ -28,20 +28,22 @@ export default function DocumentUploadPage() {
 
   const [documents, setDocuments] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
   const handleFileSelect = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event) => {
-    const files = Array.from(event.target.files || []);
+  const processFiles = async (files) => {
+    if (isUploading) {
+      return;
+    }
+
     const pdfFiles = files.filter(
       (file) =>
         file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
     );
-
-    event.target.value = "";
 
     if (pdfFiles.length === 0) {
       return;
@@ -66,7 +68,7 @@ export default function DocumentUploadPage() {
     const results = await Promise.allSettled(
       pdfFiles.map(async (file, index) => {
         const response = await uploadDocument(file);
-        const data = response?.data || {};
+        const data = response?.data ?? response ?? {};
         return {
           tempId: placeholders[index].tempId,
           id: data.document_id ?? placeholders[index].tempId,
@@ -95,7 +97,7 @@ export default function DocumentUploadPage() {
         pages: "-",
         chunks: "-",
         status: "업로드 실패",
-        progress: 100,
+        progress: 0,
       };
     });
 
@@ -116,6 +118,30 @@ export default function DocumentUploadPage() {
     }
 
     setIsUploading(false);
+  };
+
+  const handleFileChange = async (event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    await processFiles(files);
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (event) => {
+    event.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(event.dataTransfer.files || []);
+    await processFiles(files);
   };
 
   return (
@@ -143,7 +169,14 @@ export default function DocumentUploadPage() {
             <button
               type="button"
               onClick={handleFileSelect}
-              className="flex h-[330px] flex-col items-center justify-center gap-3.5 rounded-[22px] border border-dashed border-blue-200 bg-slate-50 p-7 text-center transition hover:bg-blue-50"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`flex h-[330px] flex-col items-center justify-center gap-3.5 rounded-[22px] border border-dashed p-7 text-center transition ${
+                isDragging
+                  ? "border-blue-500 bg-blue-50"
+                  : "border-blue-200 bg-slate-50 hover:bg-blue-50"
+              }`}
             >
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 font-mono text-[34px] font-extrabold text-blue-600">
                 ↑
