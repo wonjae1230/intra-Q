@@ -34,6 +34,8 @@ def query(
     question: str,
     top_k: int | None = None,
     document_ids: list[int] | None = None,
+    history: list[dict] | None = None,
+    approach_hint: str | None = None,
 ) -> dict[str, Any]:
     """Answer a question using retrieved chunks and return answer plus sources."""
 
@@ -44,16 +46,65 @@ def query(
     retriever = Retriever()
     generator = AnswerGenerator()
 
+    # Rewrite follow-up questions into standalone search queries using conversation history.
+    search_query = generator.rewrite_query(question, history or [])
+
     final_top_k = top_k or config.top_k
     if config.reranker_enabled:
         fetch_k = final_top_k * config.reranker_fetch_multiplier
-        chunks = retriever.retrieve(question, top_k=fetch_k, document_ids=document_ids)
+        chunks = retriever.retrieve(search_query, top_k=fetch_k, document_ids=document_ids)
         reranker = VertexAIReranker()
-        chunks = reranker.rerank(question, chunks, top_n=config.reranker_top_n)
+        chunks = reranker.rerank(search_query, chunks, top_n=config.reranker_top_n)
     else:
-        chunks = retriever.retrieve(question, top_k=final_top_k, document_ids=document_ids)
+        chunks = retriever.retrieve(search_query, top_k=final_top_k, document_ids=document_ids)
 
-    return generator.generate(question, chunks)
+    return generator.generate(question, chunks, history=history, approach_hint=approach_hint)
+
+
+def search_with_options(
+    question: str,
+    document_ids: list[int] | None = None,
+) -> dict[str, Any]:
+    """Search for relevant chunks, then ask LLM to generate answer approach options."""
+
+    if not question or not question.strip():
+        raise ValueError("question must not be empty")
+
+    config = get_config()
+    retriever = Retriever()
+    generator = AnswerGenerator()
+
+    fetch_k = config.top_k * config.reranker_fetch_multiplier
+    chunks = retriever.retrieve(question, top_k=fetch_k, document_ids=document_ids)
+
+    # Collect unique document_ids from retrieved chunks for the final chat call.
+    seen_doc_ids: list[int] = []
+    seen_set: set[int] = set()
+    for chunk in chunks:
+        doc_id = chunk.get("document_id")
+        if doc_id is not None and int(doc_id) not in seen_set:
+            seen_set.add(int(doc_id))
+            seen_doc_ids.append(int(doc_id))
+
+    result = generator.generate_clarify_options(question, chunks)
+    rtype = result.get("type", "direct")
+
+    if rtype == "context":
+        return {
+            "question": question,
+            "options": [],
+            "document_ids": seen_doc_ids,
+            "context_question": result.get("question"),
+        }
+    if rtype == "options":
+        return {
+            "question": question,
+            "options": result.get("items", []),
+            "document_ids": seen_doc_ids,
+            "context_question": None,
+        }
+    # direct
+    return {"question": question, "options": [], "document_ids": seen_doc_ids, "context_question": None}
 
 
 def delete_document_embeddings(document_id: int) -> dict[str, Any]:
