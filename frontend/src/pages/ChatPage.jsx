@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { AppLayout, PdfIcon, StatusBadge } from "../components/ui";
@@ -33,12 +33,18 @@ function mapSourceFromApi(source, index) {
 
 export default function ChatPage() {
   const navigate = useNavigate();
+  const messageEndRef = useRef(null);
 
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [isSending, setIsSending] = useState(false);
   const [loadError, setLoadError] = useState("");
+
+  const wait = (ms) =>
+    new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
 
   useEffect(() => {
     const loadDocuments = async () => {
@@ -62,7 +68,13 @@ export default function ChatPage() {
     loadDocuments();
   }, []);
 
-  const activeDocuments = documents.filter((doc) => doc.status === "처리 완료");
+  useEffect(() => {
+    messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, isSending]);
+
+  const activeDocuments = documents.filter(
+    (doc) => doc.status === "처리 완료" || doc.status === "완료"
+  );
 
   const handleSendMessage = async () => {
     const trimmedQuestion = question.trim();
@@ -80,16 +92,21 @@ export default function ChatPage() {
     setMessages((prevMessages) => [...prevMessages, userMessage]);
     setQuestion("");
     setIsSending(true);
+    const minLoadingDelay = wait(1200);
 
     try {
       const response = await askQuestion(
         trimmedQuestion,
         activeDocuments.map((doc) => doc.id)
       );
-      const chatData = response?.data || {};
+
+      await minLoadingDelay;
+
+      const chatData = response?.data ?? response ?? {};
       const sources = Array.isArray(chatData.sources)
         ? chatData.sources.map(mapSourceFromApi)
         : [];
+
       const firstSource = sources[0];
 
       setMessages((prevMessages) => [
@@ -105,6 +122,8 @@ export default function ChatPage() {
         },
       ]);
     } catch (error) {
+      await minLoadingDelay;
+
       setMessages((prevMessages) => [
         ...prevMessages,
         {
@@ -224,7 +243,7 @@ export default function ChatPage() {
             </span>
           </header>
 
-          <div className="flex flex-1 flex-col gap-[18px] rounded-3xl border border-slate-200 bg-white p-6">
+          <div className="flex min-h-0 flex-1 flex-col gap-[18px] rounded-3xl border border-slate-200 bg-white p-6">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
               <p className="text-sm font-bold">현재 대화</p>
               <p className="text-xs text-slate-500">
@@ -232,7 +251,7 @@ export default function ChatPage() {
               </p>
             </div>
 
-            <div className="flex flex-1 flex-col gap-[18px] overflow-y-auto pr-1">
+            <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto pr-1">
               {messages.map((message) => {
                 if (message.type === "user") {
                   return (
@@ -311,15 +330,23 @@ export default function ChatPage() {
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 font-mono text-[13px] font-extrabold text-white">
                     AI
                   </div>
-                  <div className="flex items-center rounded-[18px] rounded-bl border border-slate-200 bg-slate-50 px-[18px] py-4">
-                    <span className="flex gap-1">
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
-                    </span>
+
+                  <div className="flex flex-1 flex-col gap-3">
+                    <div className="rounded-[18px] rounded-bl border border-slate-200 bg-slate-50 px-[18px] py-4">
+                      <p className="text-[15px] leading-relaxed text-slate-700">
+                        관련 문서를 찾고 답변을 생성하는 중입니다...
+                      </p>
+                      <div className="mt-3 flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-blue-500 animate-bounce [animation-delay:0ms]" />
+                        <span className="h-2 w-2 rounded-full bg-blue-500 animate-bounce [animation-delay:120ms]" />
+                        <span className="h-2 w-2 rounded-full bg-blue-500 animate-bounce [animation-delay:240ms]" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
+
+              <div ref={messageEndRef} />
             </div>
 
             <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3">
@@ -328,6 +355,7 @@ export default function ChatPage() {
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
                   onKeyDown={handleKeyDown}
+                  disabled={isSending}
                   className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
                   placeholder="질문을 입력하세요"
                 />
@@ -339,7 +367,7 @@ export default function ChatPage() {
                 disabled={isSending}
                 className="h-12 w-28 rounded-[14px] bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSending ? "전송 중..." : "전송"}
+                {isSending ? "생성 중..." : "전송"}
               </button>
             </div>
 

@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 
 export function PdfIcon({ size = "md" }) {
   const className =
@@ -60,6 +60,8 @@ export function ActionButton({
 }
 
 export function AppLayout({ children }) {
+  const navigate = useNavigate();
+
   const navItems = [
     { to: "/upload", label: "문서 업로드" },
     { to: "/documents", label: "문서 관리" },
@@ -93,6 +95,31 @@ export function AppLayout({ children }) {
             {item.label}
           </NavLink>
         ))}
+
+        <div className="ml-3 flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+            D
+          </div>
+
+          <span className="text-sm font-semibold text-slate-700">
+            Demo User
+          </span>
+
+          <button
+            type="button"
+            className="text-xs font-semibold text-slate-500 hover:text-blue-600"
+          >
+            내 정보
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/login")}
+            className="text-xs font-semibold text-red-500 hover:text-red-600"
+          >
+            로그아웃
+          </button>
+        </div>
       </nav>
 
       {children}

@@ -28,20 +28,22 @@ export default function DocumentUploadPage() {
 
   const [documents, setDocuments] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
   const handleFileSelect = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event) => {
-    const files = Array.from(event.target.files || []);
+  const processFiles = async (files) => {
+    if (isUploading) {
+      return;
+    }
+
     const pdfFiles = files.filter(
       (file) =>
         file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
     );
-
-    event.target.value = "";
 
     if (pdfFiles.length === 0) {
       return;
@@ -66,8 +68,8 @@ export default function DocumentUploadPage() {
     const results = await Promise.allSettled(
       pdfFiles.map(async (file, index) => {
         const response = await uploadDocument(file);
-        const data = response?.data || {};
-        const embeddingOk = data.embedding_status === "success";
+        const data = response?.data ?? response ?? {};
+
         return {
           tempId: placeholders[index].tempId,
           id: data.document_id ?? placeholders[index].tempId,
@@ -76,7 +78,7 @@ export default function DocumentUploadPage() {
           uploadedTime: "방금",
           pages: data.page_count ?? "-",
           chunks: data.chunk_count ?? "-",
-          status: embeddingOk ? "처리 완료" : "임베딩 실패",
+          status: "처리 완료",
           progress: 100,
         };
       })
@@ -96,13 +98,14 @@ export default function DocumentUploadPage() {
         pages: "-",
         chunks: "-",
         status: "업로드 실패",
-        progress: 100,
+        progress: 0,
       };
     });
 
     setDocuments((prevDocuments) =>
       prevDocuments.map((doc) => {
         const resolved = resolvedDocuments.find((item) => item.tempId === doc.tempId);
+
         if (!resolved) {
           return doc;
         }
@@ -112,11 +115,39 @@ export default function DocumentUploadPage() {
     );
 
     const hasFailure = results.some((result) => result.status === "rejected");
+
     if (hasFailure) {
-      setUploadError("일부 파일 업로드에 실패했습니다. 파일 형식과 서버 상태를 확인해 주세요.");
+      setUploadError(
+        "일부 파일 업로드에 실패했습니다. 파일 형식과 서버 상태를 확인해 주세요."
+      );
     }
 
     setIsUploading(false);
+  };
+
+  const handleFileChange = async (event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    await processFiles(files);
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (event) => {
+    event.preventDefault();
+    setIsDragging(false);
+
+    const files = Array.from(event.dataTransfer.files || []);
+    await processFiles(files);
   };
 
   return (
@@ -144,7 +175,14 @@ export default function DocumentUploadPage() {
             <button
               type="button"
               onClick={handleFileSelect}
-              className="flex h-[330px] flex-col items-center justify-center gap-3.5 rounded-[22px] border border-dashed border-blue-200 bg-slate-50 p-7 text-center transition hover:bg-blue-50"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`flex h-[330px] flex-col items-center justify-center gap-3.5 rounded-[22px] border border-dashed p-7 text-center transition ${
+                isDragging
+                  ? "border-blue-500 bg-blue-50"
+                  : "border-blue-200 bg-slate-50 hover:bg-blue-50"
+              }`}
             >
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 font-mono text-[34px] font-extrabold text-blue-600">
                 ↑
@@ -207,7 +245,7 @@ export default function DocumentUploadPage() {
             <div className="flex flex-col gap-3.5 overflow-y-auto pr-1">
               {documents.map((doc) => (
                 <article
-                  key={doc.tempId}
+                  key={doc.id}
                   className="rounded-[18px] border border-slate-200 bg-slate-50 p-[18px]"
                 >
                   <div className="mb-3.5 flex items-center gap-3">
@@ -246,8 +284,7 @@ export default function DocumentUploadPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/documents")}
-                  disabled={isUploading}
-                  className="h-[42px] flex-1 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="h-[42px] flex-1 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 transition hover:bg-slate-50"
                 >
                   문서 관리로 이동
                 </button>
@@ -255,10 +292,9 @@ export default function DocumentUploadPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/chat")}
-                  disabled={isUploading}
-                  className="h-[42px] flex-1 rounded-xl bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="h-[42px] flex-1 rounded-xl bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700"
                 >
-                  {isUploading ? "처리 중..." : "질문하러 가기"}
+                  질문하러 가기
                 </button>
               </div>
             </div>
