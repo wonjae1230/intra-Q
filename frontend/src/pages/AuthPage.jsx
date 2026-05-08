@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login, register } from "../lib/api";
 
+import { setAuthenticated } from "../lib/auth";
+
 function IntraQIllustration() {
   return (
     <div className="relative h-[220px] w-[360px] rounded-[28px] border border-slate-200 bg-slate-50">
@@ -124,9 +126,7 @@ export function LoginPage() {
             </button>
           </div>
 
-          {error && (
-            <p className="mt-3 text-sm text-red-500">{error}</p>
-          )}
+          {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
 
           <button
             type="submit"
@@ -138,7 +138,7 @@ export function LoginPage() {
 
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={handleDemoLogin}
             className="mt-3 h-[42px] w-full rounded-[14px] border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             샘플 계정으로 체험하기
@@ -270,9 +270,7 @@ export function SignupPage() {
             </label>
           </div>
 
-          {error && (
-            <p className="mt-3 text-sm text-red-500">{error}</p>
-          )}
+          {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
 
           <button
             type="submit"

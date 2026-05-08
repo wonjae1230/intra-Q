@@ -1,7 +1,14 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { AppLayout, PdfIcon, StatusBadge } from "../components/ui";
+import {
+  AppLayout,
+  PageHeader,
+  PageShell,
+  Panel,
+  PdfIcon,
+  StatusBadge,
+} from "../components/ui";
 import { uploadDocument } from "../lib/api";
 
 const stages = [
@@ -152,24 +159,19 @@ export default function DocumentUploadPage() {
 
   return (
     <AppLayout>
-      <div className="mx-auto flex min-h-[calc(100vh-136px)] max-w-[1296px] flex-col gap-6">
-        <header className="flex items-center gap-6">
-          <div className="flex-1">
-            <h1 className="text-[34px] font-bold tracking-normal">
-              문서 업로드
-            </h1>
-            <p className="mt-2 text-[15px] text-slate-500">
-              PDF 문서를 업로드하면 질문에 사용할 수 있도록 자동 분석됩니다.
-            </p>
-          </div>
-
+      <PageShell>
+        <PageHeader
+          title="문서 업로드"
+          description="PDF 문서를 업로드하면 질문에 사용할 수 있도록 자동 분석됩니다."
+          action={
           <span className="rounded-full border border-blue-200 bg-blue-50 px-[13px] py-[9px] text-[13px] font-bold text-blue-600">
             문서 분석 준비
           </span>
-        </header>
+          }
+        />
 
         <div className="flex flex-1 gap-6">
-          <section className="flex w-[470px] flex-col gap-[18px] rounded-3xl border border-slate-200 bg-white p-[22px]">
+          <Panel className="flex w-[470px] flex-col gap-[18px] p-[22px]">
             <h2 className="text-lg font-bold">PDF 업로드</h2>
 
             <button
@@ -226,9 +228,9 @@ export default function DocumentUploadPage() {
                 ))}
               </div>
             </div>
-          </section>
+          </Panel>
 
-          <section className="flex flex-1 flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-[22px]">
+          <Panel className="flex flex-1 flex-col gap-4 p-[22px]">
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <h2 className="text-xl font-bold">업로드된 문서</h2>
@@ -298,9 +300,9 @@ export default function DocumentUploadPage() {
                 </button>
               </div>
             </div>
-          </section>
+          </Panel>
         </div>
-      </div>
+      </PageShell>
     </AppLayout>
   );
 }
