@@ -7,6 +7,7 @@ import DocumentDetailPage from "./pages/DocumentDetailPage";
 import EmptyStatePage from "./pages/EmptyStatePage";
 import AnswerNotFoundPage from "./pages/AnswerNotFoundPage";
 import ServerErrorPage from "./pages/ServerErrorPage";
+import { LoginPage, SignupPage } from "./pages/AuthPage";
 
 function App() {
   return (
@@ -20,6 +21,8 @@ function App() {
         <Route path="/error/not-found" element={<AnswerNotFoundPage />} />
         <Route path="/error/server" element={<ServerErrorPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
       </Routes>
     </BrowserRouter>
   );
