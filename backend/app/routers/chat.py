@@ -10,9 +10,10 @@ from app.core.dependencies import get_current_user
 from app.database.session import get_db
 from app.models.document import Document
 from app.models.user import User
-from app.schemas.chat import ChatData, ChatRequest, ChatResponse
+from app.schemas.chat import ChatData, ChatRequest, ChatResponse, ClarifyData, ClarifyOption, ClarifyResponse
 from app.services.chat_history_service import save_assistant_message, save_user_message
 from app.services.chat_service import generate_chat_response
+from rag.pipeline import search_with_options
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -44,6 +45,40 @@ def _resolve_user_document_ids(db: Session, user_id: int, requested_ids: list[in
 
 
 @router.post(
+    "/clarify",
+    response_model=ClarifyResponse,
+    summary="Search documents and return options",
+    description="Run vector search and return grouped document options for the user to choose from before generating an answer.",
+)
+def clarify(
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ClarifyResponse:
+    logger.info("Clarify request received: user_id=%s, question=%s", current_user.id, request.question)
+    try:
+        document_ids = _resolve_user_document_ids(db, current_user.id, request.document_ids)
+        result = search_with_options(request.question, document_ids=document_ids)
+        options = [ClarifyOption(**opt) for opt in result["options"]]
+        return ClarifyResponse(
+            message="Document options retrieved successfully",
+            data=ClarifyData(
+                question=request.question,
+                options=options,
+                document_ids=result.get("document_ids", document_ids),
+                context_question=result.get("context_question"),
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Clarify server error")
+        raise HTTPException(status_code=500, detail="내부 서버 오류") from exc
+
+
+@router.post(
     "",
     response_model=ChatResponse,
     summary="Generate a chat answer",
@@ -71,6 +106,9 @@ def chat(
             request.question,
             document_ids=document_ids,
             top_k=request.top_k,
+            db=db,
+            user_id=current_user.id,
+            approach_hint=request.approach_hint,
         )
 
         try:
