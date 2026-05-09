@@ -1,4 +1,4 @@
-"""Vertex AI Ranking API reranker."""
+"""구글 버텍스 AI 를 통한 reranker"""
 
 from __future__ import annotations
 

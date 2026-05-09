@@ -1,4 +1,4 @@
-"""Answer generation from retrieved chunks."""
+"""응답파트"""
 
 from __future__ import annotations
 
@@ -35,6 +35,8 @@ class AnswerGenerator:
             f"{'사용자' if msg['role'] == 'user' else 'AI'}: {msg['content'][:200]}"
             for msg in history
         )
+        
+        """프롬프트 관련 내용"""
         prompt = (
             "당신은 기업 내부 문서 검색 전문가입니다.\n"
             "아래 대화 기록을 참고하여 새로운 질문을 문서 검색에 최적화된 독립적인 쿼리로 재작성하세요.\n\n"
@@ -67,6 +69,7 @@ class AnswerGenerator:
             f"[{i+1}] {c.get('file_name', 'unknown')} p.{c.get('page', '?')}: {c.get('content', '')[:200]}"
             for i, c in enumerate(chunks[:6])
         )
+        """프롬프트 리팩토링 파트"""
         prompt = (
             "당신은 질문 분석 전문가입니다. 아래 문서 조각들과 질문을 보고 세 가지 유형 중 하나로 분류하세요.\n\n"
             f"질문: {question}\n\n"
@@ -117,6 +120,7 @@ class AnswerGenerator:
                 "sources": [],
             }
 
+        """최종 응답 파트 """
         prompt = self._build_prompt(question, chunks, history, approach_hint)
         response = self._client.invoke(
             [
