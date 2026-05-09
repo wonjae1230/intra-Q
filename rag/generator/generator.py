@@ -36,9 +36,14 @@ class AnswerGenerator:
             for msg in history
         )
         prompt = (
-            "아래 대화 기록을 참고하여 새로운 질문을 문서 검색에 사용할 독립적인 쿼리로 재작성하세요.\n"
-            "질문이 이미 독립적이면 그대로 반환하세요.\n"
-            "검색 쿼리만 출력하세요. 설명이나 따옴표 없이.\n\n"
+            "당신은 기업 내부 문서 검색 전문가입니다.\n"
+            "아래 대화 기록을 참고하여 새로운 질문을 문서 검색에 최적화된 독립적인 쿼리로 재작성하세요.\n\n"
+            "재작성 원칙:\n"
+            "- '그것', '해당', '위의', '앞서' 같은 대명사를 대화 기록에서 찾아 구체적인 용어로 치환하세요.\n"
+            "- 질문의 핵심 키워드와 도메인 용어(규정명, 절차명, 시스템명 등)를 명확히 포함하세요.\n"
+            "- 불필요한 경어나 구어체를 제거하고 명사 중심의 검색 쿼리 형식으로 작성하세요.\n"
+            "- 질문이 이미 독립적이면 그대로 반환하세요.\n"
+            "- 검색 쿼리만 출력하세요. 설명이나 따옴표 없이.\n\n"
             f"대화 기록:\n{history_text}\n\n"
             f"새로운 질문: {question}\n\n"
             "독립적인 검색 쿼리:"
@@ -63,18 +68,23 @@ class AnswerGenerator:
             for i, c in enumerate(chunks[:6])
         )
         prompt = (
-            "아래 문서 조각들을 바탕으로 질문을 분석하세요.\n\n"
+            "당신은 질문 분석 전문가입니다. 아래 문서 조각들과 질문을 보고 세 가지 유형 중 하나로 분류하세요.\n\n"
             f"질문: {question}\n\n"
             f"문서 조각:\n{context_preview}\n\n"
-            "지시사항:\n"
-            "1. 질문에 '나', '내가', '우리', '저의' 등 사용자 개인 맥락(학과, 학년, 부서, 직책 등)이 필요한데 "
-            "   해당 정보가 없어서 정확히 답하기 어려우면 아래 형식으로 반환하세요:\n"
-            '   {"type":"context","question":"어느 학과/학년이신가요?"}\n\n'
-            "2. 질문이 단순하거나 해석 방향이 하나뿐이면:\n"
-            '   {"type":"direct"}\n\n'
-            "3. 여러 관점이 가능하면 2-3개의 접근 방향을 제시하세요:\n"
-            '   {"type":"options","items":[{"id":"1","label":"공식 요건 기준","description":"..."},{"id":"2","label":"실무 처리 기준","description":"..."}]}\n\n'
-            "반드시 JSON만 출력하세요. 설명 없이.\n\n"
+            "분류 기준:\n\n"
+            "유형 1 — 개인 맥락 필요 (context):\n"
+            "  질문에 '나', '내가', '우리', '저의', '제' 등이 포함되어 있고,\n"
+            "  문서 내 여러 대상(학과, 부서, 직급, 연도 등) 중 어느 것을 검색해야 할지 알 수 없는 경우.\n"
+            "  → 구체적인 맥락 확인 질문을 한국어로 작성하세요.\n"
+            '  예: {"type":"context","question":"어느 학과/학년이신가요? (예: 소프트웨어융합학과 3학년)"}\n\n'
+            "유형 2 — 단순 질문 (direct):\n"
+            "  답변 방향이 명확하거나, 문서에서 바로 찾을 수 있는 사실 기반 질문인 경우.\n"
+            '  예: {"type":"direct"}\n\n'
+            "유형 3 — 다관점 질문 (options):\n"
+            "  동일 질문에 대해 해석 관점이 여러 개 존재하고, 사용자가 원하는 방향에 따라 답변이 달라지는 경우.\n"
+            "  label은 5단어 이내, description은 한 문장으로 작성하세요.\n"
+            '  예: {"type":"options","items":[{"id":"1","label":"공식 규정 기준","description":"규정집에 명시된 공식 절차와 요건 중심으로 답변합니다."},{"id":"2","label":"실무 적용 기준","description":"실제 업무에서 통용되는 실무 방식 중심으로 답변합니다."}]}\n\n'
+            "반드시 JSON만 출력하세요. 마크다운 코드 블록 없이.\n\n"
             "JSON:"
         )
         try:
@@ -112,9 +122,14 @@ class AnswerGenerator:
             [
                 SystemMessage(
                     content=(
-                        "당신은 기업 내부 문서 Q&A 도우미입니다. "
-                        "반드시 제공된 문서 조각에 근거해서 한국어로 답변하세요. "
-                        "근거가 부족하면 추측하지 말고 부족하다고 말하세요."
+                        "당신은 기업 내부 문서 Q&A 전문 도우미입니다.\n\n"
+                        "[핵심 원칙]\n"
+                        "1. 반드시 제공된 문서 조각만을 근거로 답변하세요. "
+                        "일반 학습 지식으로 보완하거나 추측하지 마세요.\n"
+                        "2. 답변의 각 주요 사실·수치·절차를 언급할 때 반드시 해당 출처 번호([1], [2] 등)를 표시하세요.\n"
+                        "3. 문서에서 확인되지 않는 정보는 '제공된 문서에서 [해당 내용]을 확인할 수 없습니다'라고 명확히 밝히세요.\n"
+                        "4. 부분적으로만 답할 수 있다면 확인된 부분과 확인되지 않은 부분을 구분하여 설명하세요.\n"
+                        "5. 답변은 한국어로 작성하세요."
                     )
                 ),
                 HumanMessage(content=prompt),
@@ -129,22 +144,32 @@ class AnswerGenerator:
                 f"{'사용자' if msg['role'] == 'user' else 'AI'}: {msg['content'][:300]}"
                 for msg in history
             )
-            history_block = f"이전 대화:\n{history_lines}\n\n"
+            history_block = f"[이전 대화]\n{history_lines}\n\n"
 
         context_blocks = []
         for index, chunk in enumerate(chunks, start=1):
             source = f"{chunk.get('file_name', 'unknown')} p.{chunk.get('page', 'unknown')}"
-            context_blocks.append(f"[{index}] {source}\n{chunk['content']}")
+            context_blocks.append(f"[{index}] 출처: {source}\n{chunk['content']}")
 
-        approach_block = f"다음 관점에서 답변하세요: {approach_hint}\n\n" if approach_hint else ""
+        approach_block = f"[답변 관점]\n{approach_hint}\n\n" if approach_hint else ""
+
+        citation_guide = (
+            "[출처 표기 규칙]\n"
+            "- 사실·수치·절차를 언급할 때마다 [1], [2] 형식으로 출처 번호를 표시하세요.\n"
+            "- 여러 문서가 같은 내용을 지지하면 [1][3]처럼 중복 표기하세요.\n"
+            "- 문서에서 직접 확인되지 않는 내용은 절대 포함하지 마세요.\n"
+            "- 질문에 답하기 위한 정보가 문서에 없다면 어떤 정보가 없는지 구체적으로 밝히세요.\n\n"
+        )
+
         return (
             "아래 문서 조각만 사용해서 질문에 답변하세요.\n\n"
+            + citation_guide
             + approach_block
             + history_block
-            + f"질문:\n{question}\n\n"
-            + "문서 조각:\n"
+            + f"[질문]\n{question}\n\n"
+            + "[문서 조각]\n"
             + "\n\n".join(context_blocks)
-            + "\n\n답변에는 핵심 절차나 조건을 명확히 정리하세요."
+            + "\n\n[답변] 핵심 절차·조건을 명확히 정리하고, 각 내용마다 출처 번호를 표시하세요."
         )
 
 
