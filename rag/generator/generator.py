@@ -26,6 +26,38 @@ class AnswerGenerator:
             location=config.vertex_ai_location,
         )
 
+    def generate_query_variants(self, question: str, history: list[dict], n: int = 3) -> list[str]:
+        """원본 쿼리의 다양한 관점 변형 n개를 생성해 반환. 원본 포함."""
+        if n <= 1:
+            return [question]
+
+        history_text = ""
+        if history:
+            history_text = "\n".join(
+                f"{'사용자' if msg['role'] == 'user' else 'AI'}: {msg['content'][:200]}"
+                for msg in history
+            ) + "\n\n"
+
+        prompt = (
+            "당신은 기업 내부 문서 검색 전문가입니다.\n"
+            "아래 질문에 대해 벡터 검색 결과를 다양화하기 위한 "
+            f"서로 다른 관점의 검색 쿼리 {n}개를 생성하세요.\n\n"
+            "작성 원칙:\n"
+            "- 각 쿼리는 동일한 정보 니즈를 다른 표현·관점·범위로 나타내야 합니다.\n"
+            "- 상위 개념, 하위 개념, 유사 용어, 절차적 표현 등을 활용하세요.\n"
+            "- 각 쿼리를 새 줄에 하나씩만 출력하세요. 번호나 설명 없이.\n\n"
+            + (f"대화 기록:\n{history_text}" if history_text else "")
+            + f"질문: {question}\n\n"
+            "검색 쿼리들:"
+        )
+        response = self._client.invoke([HumanMessage(content=prompt)])
+        lines = [l.strip().strip('"').strip("'") for l in str(response.content).strip().splitlines()]
+        variants = [l for l in lines if l][:n]
+        # 원본이 포함되지 않은 경우 맨 앞에 추가
+        if question not in variants:
+            variants = [question] + variants[:n - 1]
+        return variants
+
     def rewrite_query(self, question: str, history: list[dict]) -> str:
         """Rewrite a follow-up question into a standalone search query using conversation history."""
         if not history:
@@ -76,12 +108,16 @@ class AnswerGenerator:
             f"문서 조각:\n{context_preview}\n\n"
             "분류 기준:\n\n"
             "유형 1 — 개인 맥락 필요 (context):\n"
-            "  질문에 '나', '내가', '우리', '저의', '제' 등이 포함되어 있고,\n"
-            "  문서 내 여러 대상(학과, 부서, 직급, 연도 등) 중 어느 것을 검색해야 할지 알 수 없는 경우.\n"
-            "  → 구체적인 맥락 확인 질문을 한국어로 작성하세요.\n"
+            "  다음 조건을 모두 만족해야 합니다:\n"
+            "  (a) 질문에 '나', '내가', '우리', '저의', '제' 등 1인칭 표현이 있다\n"
+            "  (b) 문서에 학과·부서·직급·연도 등 여러 대상이 섞여 있어 어느 것을 검색해야 할지 알 수 없다\n"
+            "  (c) 문서에 질문자의 이름·학번이 명시된 개인 기록(이체확인서, 영수증, 과제물 등)이 없다\n"
+            "  → 조건을 모두 만족할 때만 맥락 확인 질문을 한국어로 작성하세요.\n"
             '  예: {"type":"context","question":"어느 학과/학년이신가요? (예: 소프트웨어융합학과 3학년)"}\n\n'
             "유형 2 — 단순 질문 (direct):\n"
-            "  답변 방향이 명확하거나, 문서에서 바로 찾을 수 있는 사실 기반 질문인 경우.\n"
+            "  다음 중 하나라도 해당하면 direct로 분류하세요:\n"
+            "  - 답변 방향이 명확하거나 문서에서 바로 찾을 수 있는 사실 기반 질문\n"
+            "  - 문서에 질문자의 이름·학번이 명시된 개인 기록이 있어 바로 답변 가능한 경우\n"
             '  예: {"type":"direct"}\n\n'
             "유형 3 — 다관점 질문 (options):\n"
             "  동일 질문에 대해 해석 관점이 여러 개 존재하고, 사용자가 원하는 방향에 따라 답변이 달라지는 경우.\n"

@@ -37,6 +37,9 @@ class RagConfig:
     reranker_model: str = os.getenv("RERANKER_MODEL", "semantic-ranker-default@latest")
     reranker_top_n: int = int(os.getenv("RERANKER_TOP_N", "5"))
     reranker_fetch_multiplier: int = int(os.getenv("RERANKER_FETCH_MULTIPLIER", "3"))
+    # Retrieval diversity
+    max_chunks_per_doc: int = int(os.getenv("RAG_MAX_CHUNKS_PER_DOC", "2"))
+    query_variants_count: int = int(os.getenv("RAG_QUERY_VARIANTS", "3"))
 
 
 def get_config() -> RagConfig:
