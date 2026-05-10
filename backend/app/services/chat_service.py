@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.schemas.chat import ChatData, SourceItem
-from app.services.chat_history_service import list_chat_history
+from app.services.chat_history_service import list_chat_history, list_session_messages
 from rag.pipeline import query as rag_query
 
 
@@ -61,9 +61,14 @@ def generate_chat_response(
     top_k: int | None = None,
     db: Session | None = None,
     user_id: int | None = None,
+    session_id: int | None = None,
     approach_hint: str | None = None,
 ) -> ChatData:
     """Generate a RAG response from the vector store and LLM pipeline."""
+    if isinstance(document_ids, Session):
+        db = document_ids
+        document_ids = None
+
     started_at = time.perf_counter()
     cleaned_question = question.strip()
     if not cleaned_question:
@@ -71,6 +76,7 @@ def generate_chat_response(
 
     if document_ids == []:
         return ChatData(
+            session_id=session_id or 0,
             answer="현재 사용자의 검색 가능한 문서가 없습니다. 먼저 PDF 문서를 업로드해 주세요.",
             sources=[],
             latency_ms=max(1, int((time.perf_counter() - started_at) * 1000)),
@@ -81,7 +87,10 @@ def generate_chat_response(
 
     history: list[dict] = []
     if db is not None and user_id is not None:
-        recent = list_chat_history(db, user_id, limit=6, order="desc")
+        if session_id is not None:
+            recent = list_session_messages(db, user_id, session_id, limit=6, order="desc")
+        else:
+            recent = list_chat_history(db, user_id, limit=6, order="desc")
         recent.reverse()
         history = [
             {"role": msg.role, "content": msg.content}
@@ -97,6 +106,7 @@ def generate_chat_response(
         answer = "관련 문서를 찾지 못했습니다. 다른 표현으로 질문해 주세요."
 
     return ChatData(
+        session_id=session_id or 0,
         answer=answer,
         sources=sources,
         latency_ms=max(1, int((time.perf_counter() - started_at) * 1000)),

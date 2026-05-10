@@ -9,7 +9,16 @@ import {
   PdfIcon,
   StatusBadge,
 } from "../components/ui";
-import { askQuestion, clarifyQuestion, getDocuments } from "../lib/api";
+import {
+  askQuestion,
+  clarifyQuestion,
+  createChatSession,
+  deleteChatSession,
+  getChatSessionMessages,
+  getChatSessions,
+  getDocuments,
+  updateChatSession,
+} from "../lib/api";
 
 function mapDocumentFromApi(item) {
   return {
@@ -35,6 +44,29 @@ function mapSourceFromApi(source, index) {
     page: source?.page ?? "-",
     score,
     text: source?.text || source?.preview || source?.content || "",
+  };
+}
+
+function mapChatMessageFromApi(message) {
+  const role = message?.role === "assistant" ? "ai" : message?.role;
+
+  return {
+    id: `history-${message.id}`,
+    type: role === "system" ? "ai" : role,
+    text: message?.content ?? "",
+    evidence: "",
+    sources: [],
+    createdAt: message?.created_at ?? null,
+  };
+}
+
+function mapSessionFromApi(session) {
+  return {
+    id: session.session_id,
+    title: session.title || "새 채팅",
+    updatedAt: session.updated_at,
+    messageCount: session.message_count ?? 0,
+    lastMessage: session.last_message || "",
   };
 }
 
@@ -148,12 +180,16 @@ function ClarifyMessage({ message, onSelectOption, onSubmit, disabled }) {
 
 export default function ChatPage() {
   const navigate = useNavigate();
-  const messageEndRef = useRef(null);
+  const messageListRef = useRef(null);
 
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
+  const [chatSessions, setChatSessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [chatView, setChatView] = useState("list");
   const [documents, setDocuments] = useState([]);
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [sessionDocumentIds, setSessionDocumentIds] = useState(null);
 
@@ -184,8 +220,128 @@ export default function ChatPage() {
     loadDocuments();
   }, []);
 
+  const refreshChatSessions = async () => {
+    const response = await getChatSessions();
+    const rows = response?.data ?? [];
+    if (!Array.isArray(rows)) {
+      throw new Error("채팅 세션 목록 응답 형식이 올바르지 않습니다.");
+    }
+    const mappedSessions = rows.map(mapSessionFromApi);
+    setChatSessions(mappedSessions);
+    return mappedSessions;
+  };
+
+  const loadSessionMessages = async (sessionId) => {
+    const response = await getChatSessionMessages(sessionId, { limit: 50, order: "asc" });
+    const rows = response?.data ?? [];
+    if (!Array.isArray(rows)) {
+      throw new Error("채팅 메시지 응답 형식이 올바르지 않습니다.");
+    }
+    setMessages(rows.map(mapChatMessageFromApi));
+  };
+
+  const openChatSession = async (sessionId) => {
+    setActiveSessionId(sessionId);
+    setMessages([]);
+    setSessionDocumentIds(null);
+    await loadSessionMessages(sessionId);
+    setChatView("room");
+  };
+
+  const handleOpenChatSession = async (sessionId) => {
+    if (isSending) return;
+    try {
+      setLoadError("");
+      await openChatSession(sessionId);
+    } catch (error) {
+      setLoadError(error.message);
+    }
+  };
+
+  const ensureActiveSession = async (title = null) => {
+    if (activeSessionId) {
+      return activeSessionId;
+    }
+
+    const response = await createChatSession(title);
+    const created = response?.data;
+    if (!created?.session_id) {
+      throw new Error("채팅 세션 생성 응답 형식이 올바르지 않습니다.");
+    }
+
+    const newSession = {
+      id: created.session_id,
+      title: created.title || "새 채팅",
+      updatedAt: created.created_at,
+      messageCount: 0,
+      lastMessage: "",
+    };
+    setChatSessions((prev) => [newSession, ...prev]);
+    setActiveSessionId(created.session_id);
+    setMessages([]);
+    setSessionDocumentIds(null);
+    return created.session_id;
+  };
+
   useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    let isActive = true;
+
+    const loadChatSessions = async () => {
+      try {
+        setIsLoadingSessions(true);
+        const sessions = await refreshChatSessions();
+        if (!isActive) return;
+
+        if (sessions.length > 0) {
+          setActiveSessionId(sessions[0].id);
+          setMessages([]);
+          setChatView("list");
+        } else {
+          const response = await createChatSession();
+          const created = response?.data;
+          if (!created?.session_id) {
+            throw new Error("채팅 세션 생성 응답 형식이 올바르지 않습니다.");
+          }
+          if (!isActive) return;
+          setChatSessions([
+            {
+              id: created.session_id,
+              title: created.title || "새 채팅",
+              updatedAt: created.created_at,
+              messageCount: 0,
+              lastMessage: "",
+            },
+          ]);
+          setActiveSessionId(created.session_id);
+          setMessages([]);
+          setChatView("list");
+        }
+      } catch (error) {
+        if (isActive) {
+          setLoadError(error.message);
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingSessions(false);
+        }
+      }
+    };
+
+    loadChatSessions();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const messageList = messageListRef.current;
+    if (!messageList) return;
+
+    messageList.scrollTo({
+      top: messageList.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages, isSending]);
 
   const activeDocuments = documents.filter(
@@ -196,6 +352,14 @@ export default function ChatPage() {
     const trimmedQuestion = question.trim();
     if (!trimmedQuestion || isSending) return;
 
+    let currentSessionId;
+    try {
+      currentSessionId = await ensureActiveSession(trimmedQuestion.slice(0, 100));
+    } catch (error) {
+      setLoadError(error.message);
+      return;
+    }
+
     const userMessage = { id: Date.now(), type: "user", text: trimmedQuestion };
     setMessages((prev) => [...prev, userMessage]);
     setQuestion("");
@@ -203,7 +367,7 @@ export default function ChatPage() {
 
     // 이미 문서가 선택된 대화 세션이면 clarify 없이 바로 답변
     if (sessionDocumentIds !== null) {
-      await _fetchAnswer(trimmedQuestion, sessionDocumentIds);
+      await _fetchAnswer(trimmedQuestion, sessionDocumentIds, null, currentSessionId);
       return;
     }
 
@@ -238,7 +402,7 @@ export default function ChatPage() {
       // LLM decided the question is simple — skip clarify and answer directly
       if (options.length === 0) {
         setSessionDocumentIds(returnedDocumentIds);
-        await _fetchAnswer(trimmedQuestion, returnedDocumentIds);
+        await _fetchAnswer(trimmedQuestion, returnedDocumentIds, null, currentSessionId);
         return;
       }
 
@@ -270,10 +434,13 @@ export default function ChatPage() {
     }
   };
 
-  const _fetchAnswer = async (q, documentIds, approachHint = null) => {
+  const _fetchAnswer = async (q, documentIds, approachHint = null, sessionId = activeSessionId) => {
     const minLoadingDelay = wait(1200);
     try {
-      const response = await askQuestion(q, documentIds, approachHint);
+      if (!sessionId) {
+        throw new Error("활성 채팅 세션이 없습니다.");
+      }
+      const response = await askQuestion(sessionId, q, documentIds, approachHint);
       await minLoadingDelay;
 
       const chatData = response?.data ?? response ?? {};
@@ -292,6 +459,7 @@ export default function ChatPage() {
           sources,
         },
       ]);
+      await refreshChatSessions();
     } catch (error) {
       await minLoadingDelay;
       setMessages((prev) => [
@@ -311,6 +479,14 @@ export default function ChatPage() {
 
   const handleSubmitContext = async (messageId, originalQuestion, userContext) => {
     if (isSending) return;
+    let currentSessionId;
+    try {
+      currentSessionId = await ensureActiveSession(originalQuestion.slice(0, 100));
+    } catch (error) {
+      setLoadError(error.message);
+      return;
+    }
+
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, answered: true } : m))
     );
@@ -348,7 +524,7 @@ export default function ChatPage() {
 
       if (options.length === 0) {
         setSessionDocumentIds(returnedDocumentIds);
-        await _fetchAnswer(enrichedQuestion, returnedDocumentIds);
+        await _fetchAnswer(enrichedQuestion, returnedDocumentIds, null, currentSessionId);
         return;
       }
 
@@ -388,6 +564,11 @@ export default function ChatPage() {
 
   const handleSubmitClarify = async (messageId, originalQuestion, selectedId, documentIds) => {
     if (!selectedId || isSending) return;
+    const currentSessionId = activeSessionId;
+    if (!currentSessionId) {
+      setLoadError("활성 채팅 세션이 없습니다.");
+      return;
+    }
 
     const msg = messages.find((m) => m.id === messageId);
     const selectedOption = msg?.options.find((o) => o.id === selectedId);
@@ -398,7 +579,7 @@ export default function ChatPage() {
     );
     setSessionDocumentIds(documentIds);
     setIsSending(true);
-    await _fetchAnswer(originalQuestion, documentIds, approachHint);
+    await _fetchAnswer(originalQuestion, documentIds, approachHint, currentSessionId);
   };
 
   const handleKeyDown = (event) => {
@@ -407,10 +588,82 @@ export default function ChatPage() {
     }
   };
 
+  const handleStartNewSession = async () => {
+    if (isSending) return;
+    try {
+      setLoadError("");
+      const response = await createChatSession();
+      const created = response?.data;
+      if (!created?.session_id) {
+        throw new Error("채팅 세션 생성 응답 형식이 올바르지 않습니다.");
+      }
+      setChatSessions((prev) => [
+        {
+          id: created.session_id,
+          title: created.title || "새 채팅",
+          updatedAt: created.created_at,
+          messageCount: 0,
+          lastMessage: "",
+        },
+        ...prev,
+      ]);
+      setActiveSessionId(created.session_id);
+      setMessages([]);
+      setQuestion("");
+      setSessionDocumentIds(null);
+      setChatView("room");
+    } catch (error) {
+      setLoadError(error.message);
+    }
+  };
+
+  const handleRenameSession = async (sessionId) => {
+    const current = chatSessions.find((session) => session.id === sessionId);
+    const nextTitle = window.prompt("채팅 제목", current?.title || "새 채팅");
+    if (nextTitle === null) return;
+
+    try {
+      const response = await updateChatSession(sessionId, nextTitle);
+      const updated = response?.data;
+      setChatSessions((prev) =>
+        prev.map((session) =>
+          session.id === sessionId
+            ? { ...session, title: updated?.title || nextTitle.trim() }
+            : session
+        )
+      );
+    } catch (error) {
+      setLoadError(error.message);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    if (isSending || !window.confirm("이 채팅 세션을 삭제할까요?")) return;
+
+    try {
+      await deleteChatSession(sessionId);
+      const remaining = chatSessions.filter((session) => session.id !== sessionId);
+      setChatSessions(remaining);
+
+      if (activeSessionId === sessionId) {
+        if (remaining.length > 0) {
+          await openChatSession(remaining[0].id);
+        } else {
+          setActiveSessionId(null);
+          setMessages([]);
+          setChatView("list");
+          await handleStartNewSession();
+        }
+      }
+    } catch (error) {
+      setLoadError(error.message);
+    }
+  };
+
   return (
     <AppLayout>
-      <PageShell direction="row" className="h-[calc(100vh-136px)] min-h-0 overflow-hidden">
-        <Panel as="aside" className="flex min-h-0 w-[340px] shrink-0 flex-col gap-5 p-5">
+      <PageShell direction="row">
+        <Panel as="aside" className="flex h-[887.61px] w-[340px] shrink-0 flex-col gap-5 overflow-hidden p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 font-mono text-[22px] font-extrabold text-white">
               Q
@@ -457,26 +710,28 @@ export default function ChatPage() {
               </span>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-              {activeDocuments.map((doc) => (
-                <article
-                  key={doc.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-3.5"
-                >
-                  <div className="mb-2.5 flex items-center gap-2.5">
-                    <PdfIcon />
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+              <div className="flex flex-col gap-3">
+            {activeDocuments.map((doc) => (
+              <article
+                key={doc.id}
+                className="rounded-2xl border border-slate-200 bg-white p-3.5"
+              >
+                <div className="mb-2.5 flex items-center gap-2.5">
+                  <PdfIcon />
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{doc.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {doc.pages} pages · {doc.size}
-                      </p>
-                    </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold">{doc.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {doc.pages} pages · {doc.size}
+                    </p>
+
                   </div>
 
-                  <StatusBadge status={doc.status} />
-                </article>
-              ))}
+                <StatusBadge status={doc.status} />
+              </article>
+            ))}
+              </div>
             </div>
           </section>
 
@@ -505,17 +760,114 @@ export default function ChatPage() {
             <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] font-semibold text-blue-600">
               {activeDocuments.length}개 문서 사용 중
             </span>
+
+            <button
+              type="button"
+              onClick={handleStartNewSession}
+              disabled={isSending}
+              className="h-10 rounded-xl border border-slate-300 bg-white px-4 text-[13px] font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              새 세션에서 질문하기
+            </button>
           </header>
 
-          <Panel className="flex min-h-0 flex-1 flex-col gap-[18px] p-6">
-            <div className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
-              <p className="text-sm font-bold">현재 대화</p>
-              <p className="text-xs text-slate-500">
-                처리 완료된 문서에서 답변 근거를 검색합니다.
-              </p>
+          {chatView === "list" ? (
+            <Panel className="flex h-[811.61px] min-h-0 flex-col gap-[18px] overflow-hidden p-6">
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold">채팅 세션</p>
+                  <p className="text-xs text-slate-500">
+                    이어서 질문할 채팅방을 선택하세요.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleStartNewSession}
+                  disabled={isSending}
+                  className="h-9 rounded-xl bg-blue-600 px-4 text-[13px] font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  새 세션
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+                <div className="grid content-start gap-3">
+                {isLoadingSessions && (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-500">
+                    불러오는 중
+                  </div>
+                )}
+
+                {!isLoadingSessions &&
+                  chatSessions.map((session) => (
+                    <article
+                      key={session.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:bg-blue-50"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleOpenChatSession(session.id)}
+                        disabled={isSending}
+                        className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <div className="flex items-center gap-3">
+                          <p className="min-w-0 flex-1 truncate text-base font-bold">
+                            {session.title}
+                          </p>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 font-mono text-xs font-bold text-slate-500">
+                            {session.messageCount}
+                          </span>
+                        </div>
+                        <p className="mt-2 line-clamp-2 min-h-8 text-sm leading-relaxed text-slate-500">
+                          {session.lastMessage || "아직 메시지가 없습니다."}
+                        </p>
+                      </button>
+
+                      <div className="mt-3 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRenameSession(session.id)}
+                          className="h-8 rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                        >
+                          이름 변경
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSession(session.id)}
+                          className="h-8 rounded-[10px] border border-red-200 bg-white px-3 text-xs font-bold text-red-500 transition hover:bg-red-50"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </Panel>
+          ) : (
+            <Panel className="flex h-[811.61px] min-h-0 flex-col gap-[18px] p-6">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setChatView("list")}
+                  disabled={isSending}
+                  className="h-8 rounded-[10px] border border-slate-300 bg-white px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  목록
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">
+                    {chatSessions.find((session) => session.id === activeSessionId)?.title || "현재 대화"}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    처리 완료된 문서에서 답변 근거를 검색합니다.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto pr-1">
+            <div ref={messageListRef} className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto overscroll-contain pr-1">
               {messages.map((message) => {
                 if (message.type === "user") {
                   return (
@@ -629,8 +981,6 @@ export default function ChatPage() {
                   </div>
                 </div>
               )}
-
-              <div ref={messageEndRef} />
             </div>
 
             {sessionDocumentIds !== null && (
@@ -688,6 +1038,7 @@ export default function ChatPage() {
               </button>
             </div>
           </Panel>
+          )}
         </section>
       </PageShell>
     </AppLayout>
