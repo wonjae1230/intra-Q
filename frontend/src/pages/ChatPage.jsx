@@ -409,8 +409,8 @@ export default function ChatPage() {
 
   return (
     <AppLayout>
-      <PageShell direction="row">
-        <Panel as="aside" className="flex w-[340px] shrink-0 flex-col gap-5 p-5">
+      <PageShell direction="row" className="h-[calc(100vh-136px)] min-h-0 overflow-hidden">
+        <Panel as="aside" className="flex min-h-0 w-[340px] shrink-0 flex-col gap-5 p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 font-mono text-[22px] font-extrabold text-white">
               Q
@@ -448,7 +448,7 @@ export default function ChatPage() {
             </button>
           </section>
 
-          <section className="flex flex-col gap-3">
+          <section className="flex min-h-0 flex-1 flex-col gap-3">
             <div className="flex items-center gap-2">
               <h2 className="text-[15px] font-bold">사용 중인 문서</h2>
               <div className="flex-1" />
@@ -457,28 +457,30 @@ export default function ChatPage() {
               </span>
             </div>
 
-            {activeDocuments.map((doc) => (
-              <article
-                key={doc.id}
-                className="rounded-2xl border border-slate-200 bg-white p-3.5"
-              >
-                <div className="mb-2.5 flex items-center gap-2.5">
-                  <PdfIcon />
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+              {activeDocuments.map((doc) => (
+                <article
+                  key={doc.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-3.5"
+                >
+                  <div className="mb-2.5 flex items-center gap-2.5">
+                    <PdfIcon />
 
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">{doc.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {doc.pages} pages · {doc.size}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold">{doc.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {doc.pages} pages · {doc.size}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <StatusBadge status={doc.status} />
-              </article>
-            ))}
+                  <StatusBadge status={doc.status} />
+                </article>
+              ))}
+            </div>
           </section>
 
-          <div className="mt-auto rounded-2xl border border-blue-200 bg-blue-50 p-3.5">
+          <div className="shrink-0 rounded-2xl border border-blue-200 bg-blue-50 p-3.5">
             <p className="text-[13px] font-bold text-blue-600">문서가 없나요?</p>
             <p className="mt-1.5 text-xs leading-relaxed text-slate-700">
               PDF를 업로드하면 질문 입력창에서 바로 검색할 수 있습니다.
@@ -491,8 +493,8 @@ export default function ChatPage() {
           </div>
         </Panel>
 
-        <section className="flex flex-1 flex-col gap-[18px]">
-          <header className="flex items-center gap-4 px-0.5 py-1">
+        <section className="flex min-h-0 flex-1 flex-col gap-[18px]">
+          <header className="flex shrink-0 items-center gap-4 px-0.5 py-1">
             <div className="flex-1">
               <h2 className="text-2xl font-bold">사내 문서 Q&amp;A</h2>
               <p className="text-sm text-slate-500">
@@ -506,7 +508,7 @@ export default function ChatPage() {
           </header>
 
           <Panel className="flex min-h-0 flex-1 flex-col gap-[18px] p-6">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+            <div className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
               <p className="text-sm font-bold">현재 대화</p>
               <p className="text-xs text-slate-500">
                 처리 완료된 문서에서 답변 근거를 검색합니다.
@@ -632,7 +634,7 @@ export default function ChatPage() {
             </div>
 
             {sessionDocumentIds !== null && (
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <span className="text-xs text-slate-500">
                   대화 세션 진행 중
                 </span>
@@ -646,7 +648,7 @@ export default function ChatPage() {
               </div>
             )}
 
-            <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3">
+            <div className="flex shrink-0 items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3">
               <div className="flex h-12 flex-1 items-center gap-2.5 rounded-[14px] border border-slate-300 bg-white px-4">
                 <input
                   value={question}
@@ -668,7 +670,7 @@ export default function ChatPage() {
               </button>
             </div>
 
-            <div className="flex justify-end gap-2 text-xs">
+            <div className="flex shrink-0 justify-end gap-2 text-xs">
               <button
                 type="button"
                 onClick={() => navigate("/error/not-found")}
