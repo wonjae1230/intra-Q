@@ -712,25 +712,25 @@ export default function ChatPage() {
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
               <div className="flex flex-col gap-3">
-            {activeDocuments.map((doc) => (
-              <article
-                key={doc.id}
-                className="rounded-2xl border border-slate-200 bg-white p-3.5"
-              >
-                <div className="mb-2.5 flex items-center gap-2.5">
-                  <PdfIcon />
+                {activeDocuments.map((doc) => (
+                  <article
+                    key={doc.id}
+                    className="rounded-2xl border border-slate-200 bg-white p-3.5"
+                  >
+                    <div className="mb-2.5 flex items-center gap-2.5">
+                      <PdfIcon />
 
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">{doc.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {doc.pages} pages · {doc.size}
-                    </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold">{doc.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {doc.pages} pages · {doc.size}
+                        </p>
+                      </div>
+                    </div>
 
-                  </div>
-
-                <StatusBadge status={doc.status} />
-              </article>
-            ))}
+                    <StatusBadge status={doc.status} />
+                  </article>
+                ))}
               </div>
             </div>
           </section>
