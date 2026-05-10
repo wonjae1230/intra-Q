@@ -14,6 +14,25 @@ from rag.vectorstore.store import ChromaVectorStore
 
 Chunk = dict[str, Any]
 
+_RRF_K = 60  # 표준 RRF 상수
+
+
+def _reciprocal_rank_fusion(result_lists: list[list[Chunk]]) -> list[Chunk]:
+    """여러 순위 목록을 RRF로 합산해 단일 정렬 목록으로 반환."""
+    # chunk content를 키로 사용해 점수 누적
+    scores: dict[str, float] = {}
+    best_chunk: dict[str, Chunk] = {}
+
+    for results in result_lists:
+        for rank, chunk in enumerate(results, start=1):
+            key = chunk.get("content", "")
+            scores[key] = scores.get(key, 0.0) + 1.0 / (_RRF_K + rank)
+            if key not in best_chunk:
+                best_chunk[key] = chunk
+
+    sorted_keys = sorted(scores, key=lambda k: scores[k], reverse=True)
+    return [best_chunk[k] for k in sorted_keys]
+
 
 def embed_chunks(chunks: list[Chunk]) -> dict[str, Any]:
     """Embed and persist document chunks.
@@ -46,17 +65,28 @@ def query(
     retriever = Retriever()
     generator = AnswerGenerator()
 
-    # Rewrite follow-up questions into standalone search queries using conversation history.
-    search_query = generator.rewrite_query(question, history or [])
+    # 다양한 관점의 쿼리 변형 생성 (원본 포함)
+    query_variants = generator.generate_query_variants(
+        question, history or [], n=config.query_variants_count
+    )
 
     final_top_k = top_k or config.top_k
+    fetch_k = final_top_k * config.reranker_fetch_multiplier if config.reranker_enabled else final_top_k
+
+    # 각 변형 쿼리로 검색 후 RRF 합산
+    result_lists = [
+        retriever.retrieve(q, top_k=fetch_k, document_ids=document_ids)
+        for q in query_variants
+    ]
+    merged = _reciprocal_rank_fusion(result_lists)
+
     if config.reranker_enabled:
-        fetch_k = final_top_k * config.reranker_fetch_multiplier
-        chunks = retriever.retrieve(search_query, top_k=fetch_k, document_ids=document_ids)
         reranker = VertexAIReranker()
-        chunks = reranker.rerank(search_query, chunks, top_n=config.reranker_top_n)
+        # reranker에는 원본 질문 기준으로 재정렬
+        search_query = query_variants[0]
+        chunks = reranker.rerank(search_query, merged, top_n=config.reranker_top_n)
     else:
-        chunks = retriever.retrieve(search_query, top_k=final_top_k, document_ids=document_ids)
+        chunks = merged[:final_top_k]
 
     return generator.generate(question, chunks, history=history, approach_hint=approach_hint)
 
@@ -75,7 +105,12 @@ def search_with_options(
     generator = AnswerGenerator()
 
     fetch_k = config.top_k * config.reranker_fetch_multiplier
-    chunks = retriever.retrieve(question, top_k=fetch_k, document_ids=document_ids)
+    query_variants = generator.generate_query_variants(question, [], n=config.query_variants_count)
+    result_lists = [
+        retriever.retrieve(q, top_k=fetch_k, document_ids=document_ids)
+        for q in query_variants
+    ]
+    chunks = _reciprocal_rank_fusion(result_lists)[:fetch_k]
 
     # Collect unique document_ids from retrieved chunks for the final chat call.
     seen_doc_ids: list[int] = []

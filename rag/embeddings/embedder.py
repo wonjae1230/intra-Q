@@ -1,4 +1,4 @@
-"""Text embedding helpers backed by OpenAI embeddings."""
+"""오픈 API 임베딩 모델"""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from rag.config import get_config
 
 
 class OpenAITextEmbedder:
-    """Convert Korean or English text chunks into embedding vectors."""
+    """한국어, 영어 청크들을 벡터로 변환"""
 
     def __init__(self, model: str | None = None) -> None:
         config = get_config()

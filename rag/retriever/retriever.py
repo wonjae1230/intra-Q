@@ -21,6 +21,7 @@ class Retriever:
         question: str,
         top_k: int | None = None,
         document_ids: list[int] | None = None,
+        max_chunks_per_doc: int | None = None,
     ) -> list[SearchResult]:
         if not question or not question.strip():
             raise ValueError("question must not be empty")
@@ -36,7 +37,22 @@ class Retriever:
             else:
                 where = {"document_id": {"$in": document_ids}}
 
-        return self.store.query_by_embedding(query_embedding, top_k=k, where=where)
+        results = self.store.query_by_embedding(query_embedding, top_k=k, where=where)
+
+        limit = max_chunks_per_doc if max_chunks_per_doc is not None else config.max_chunks_per_doc
+        return _cap_per_document(results, limit)
+
+
+def _cap_per_document(results: list[SearchResult], max_per_doc: int) -> list[SearchResult]:
+    """문서별 chunk 수를 max_per_doc으로 제한해 한 문서 독식을 방지."""
+    counts: dict = {}
+    capped: list[SearchResult] = []
+    for result in results:
+        doc_id = result.get("document_id")
+        counts[doc_id] = counts.get(doc_id, 0) + 1
+        if counts[doc_id] <= max_per_doc:
+            capped.append(result)
+    return capped
 
 
 def retrieve(
