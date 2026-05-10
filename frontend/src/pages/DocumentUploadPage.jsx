@@ -247,7 +247,7 @@ export default function DocumentUploadPage() {
             <div className="flex flex-col gap-3.5 overflow-y-auto pr-1">
               {documents.map((doc) => (
                 <article
-                  key={doc.id}
+                  key={doc.id ?? doc.tempId}
                   className="rounded-[18px] border border-slate-200 bg-slate-50 p-[18px]"
                 >
                   <div className="mb-3.5 flex items-center gap-3">

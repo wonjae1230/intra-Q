@@ -92,7 +92,7 @@ export default function DocumentManagementPage() {
 
   return (
     <AppLayout>
-      <PageShell>
+      <PageShell className="h-[calc(100vh-136px)] min-h-0 overflow-hidden">
         <PageHeader
           title="문서 관리"
           description="업로드된 문서를 확인하고 질문에 사용할 문서를 관리하세요."
@@ -107,7 +107,7 @@ export default function DocumentManagementPage() {
           }
         />
 
-        <Panel className="flex items-center gap-3.5 p-4">
+        <Panel className="flex shrink-0 items-center gap-3.5 p-4">
           <div className="flex h-[46px] flex-1 items-center gap-2.5 rounded-[14px] border border-slate-300 bg-slate-50 px-4">
             <span className="font-mono text-lg font-bold text-slate-500">
               ⌕
@@ -143,8 +143,8 @@ export default function DocumentManagementPage() {
           </div>
         </Panel>
 
-        <Panel className="overflow-hidden">
-          <div className="grid h-[54px] grid-cols-[360px_170px_100px_100px_140px_1fr] items-center gap-3 bg-slate-50 px-[18px] text-xs font-bold text-slate-500">
+        <Panel className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="grid h-[54px] shrink-0 grid-cols-[360px_170px_100px_100px_140px_1fr] items-center gap-3 bg-slate-50 px-[18px] text-xs font-bold text-slate-500">
             <div>문서명</div>
             <div>업로드 날짜</div>
             <div>페이지 수</div>
@@ -153,76 +153,78 @@ export default function DocumentManagementPage() {
             <div className="text-right">액션</div>
           </div>
 
-          {filteredDocuments.length > 0 ? (
-            filteredDocuments.map((doc, index) => {
-              const canUse = doc.status === "처리 완료";
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {filteredDocuments.length > 0 ? (
+              filteredDocuments.map((doc, index) => {
+                const canUse = doc.status === "처리 완료";
 
-              return (
-                <div
-                  key={doc.id}
-                  className={`grid h-[76px] grid-cols-[360px_170px_100px_100px_140px_1fr] items-center gap-3 px-[18px] ${
-                    index !== filteredDocuments.length - 1
-                      ? "border-b border-slate-200"
-                      : ""
-                  }`}
-                >
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <PdfIcon />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold">{doc.name}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {doc.size}
-                      </p>
+                return (
+                  <div
+                    key={doc.id}
+                    className={`grid h-[76px] grid-cols-[360px_170px_100px_100px_140px_1fr] items-center gap-3 px-[18px] ${
+                      index !== filteredDocuments.length - 1
+                        ? "border-b border-slate-200"
+                        : ""
+                    }`}
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <PdfIcon />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold">{doc.name}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {doc.size}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-[13px] text-slate-600">
+                      {doc.uploadedAt}
+                    </div>
+
+                    <div className="text-[13px] text-slate-600">
+                      {doc.pages}페이지
+                    </div>
+
+                    <div className="text-[13px] text-slate-600">
+                      {doc.chunks}청크
+                    </div>
+
+                    <StatusBadge status={doc.status} />
+
+                    <div className="flex justify-end gap-2">
+                      <ActionButton onClick={() => navigate("/documents/detail")}>
+                        보기
+                      </ActionButton>
+
+                      <ActionButton
+                        variant="primary"
+                        disabled={!canUse}
+                        onClick={() => navigate("/chat")}
+                      >
+                        질문에 사용
+                      </ActionButton>
+
+                      <ActionButton
+                        variant="danger"
+                        onClick={() => handleDeleteDocument(doc.id)}
+                      >
+                        삭제
+                      </ActionButton>
                     </div>
                   </div>
-
-                  <div className="text-[13px] text-slate-600">
-                    {doc.uploadedAt}
-                  </div>
-
-                  <div className="text-[13px] text-slate-600">
-                    {doc.pages}페이지
-                  </div>
-
-                  <div className="text-[13px] text-slate-600">
-                    {doc.chunks}청크
-                  </div>
-
-                  <StatusBadge status={doc.status} />
-
-                  <div className="flex justify-end gap-2">
-                    <ActionButton onClick={() => navigate("/documents/detail")}>
-                      보기
-                    </ActionButton>
-
-                    <ActionButton
-                      variant="primary"
-                      disabled={!canUse}
-                      onClick={() => navigate("/chat")}
-                    >
-                      질문에 사용
-                    </ActionButton>
-
-                    <ActionButton
-                      variant="danger"
-                      onClick={() => handleDeleteDocument(doc.id)}
-                    >
-                      삭제
-                    </ActionButton>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-center">
-              <p className="text-sm font-bold text-slate-700">
-                검색 결과가 없습니다.
-              </p>
-              <p className="text-xs text-slate-500">
-                {loadError || "다른 문서명으로 검색하거나 필터를 변경해보세요."}
-              </p>
-            </div>
-          )}
+                );
+              })
+            ) : (
+              <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-2 text-center">
+                <p className="text-sm font-bold text-slate-700">
+                  검색 결과가 없습니다.
+                </p>
+                <p className="text-xs text-slate-500">
+                  {loadError || "다른 문서명으로 검색하거나 필터를 변경해보세요."}
+                </p>
+              </div>
+            )}
+          </div>
         </Panel>
       </PageShell>
     </AppLayout>
