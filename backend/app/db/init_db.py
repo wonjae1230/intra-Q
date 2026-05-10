@@ -83,4 +83,5 @@ def init_db() -> None:
     _add_column_if_missing("documents", "user_id", "user_id INTEGER REFERENCES users(id)")
     _add_column_if_missing("chat_messages", "user_id", "user_id INTEGER REFERENCES users(id)")
     _add_column_if_missing("chat_messages", "session_id", "session_id INTEGER REFERENCES chat_sessions(id)")
+    _add_column_if_missing("chat_messages", "sources", "sources TEXT")
     _backfill_chat_sessions_for_existing_messages()
