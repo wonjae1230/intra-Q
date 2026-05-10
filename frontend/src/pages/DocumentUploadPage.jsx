@@ -77,6 +77,7 @@ export default function DocumentUploadPage() {
         const response = await uploadDocument(file);
         const data = response?.data ?? response ?? {};
 
+        const embeddingFailed = data.embedding_status === "failed";
         return {
           tempId: placeholders[index].tempId,
           id: data.document_id ?? placeholders[index].tempId,
@@ -85,8 +86,9 @@ export default function DocumentUploadPage() {
           uploadedTime: "방금",
           pages: data.page_count ?? "-",
           chunks: data.chunk_count ?? "-",
-          status: "처리 완료",
-          progress: 100,
+          status: embeddingFailed ? "임베딩 실패" : "처리 완료",
+          progress: embeddingFailed ? 70 : 100,
+          embeddingFailed,
         };
       })
     );
@@ -121,12 +123,13 @@ export default function DocumentUploadPage() {
       })
     );
 
-    const hasFailure = results.some((result) => result.status === "rejected");
+    const hasNetworkFailure = results.some((result) => result.status === "rejected");
+    const hasEmbeddingFailure = resolvedDocuments.some((doc) => doc.embeddingFailed);
 
-    if (hasFailure) {
-      setUploadError(
-        "일부 파일 업로드에 실패했습니다. 파일 형식과 서버 상태를 확인해 주세요."
-      );
+    if (hasNetworkFailure) {
+      setUploadError("일부 파일 업로드에 실패했습니다. 파일 형식과 서버 상태를 확인해 주세요.");
+    } else if (hasEmbeddingFailure) {
+      setUploadError("문서는 저장됐지만 임베딩에 실패했습니다. 해당 문서는 검색에 사용할 수 없으니 삭제 후 다시 업로드해 주세요.");
     }
 
     setIsUploading(false);
@@ -267,7 +270,7 @@ export default function DocumentUploadPage() {
 
                   <div className="h-2 overflow-hidden rounded-full bg-slate-200">
                     <div
-                      className="h-full rounded-full bg-blue-600 transition-all"
+                      className={`h-full rounded-full transition-all ${doc.embeddingFailed ? "bg-red-500" : "bg-blue-600"}`}
                       style={{ width: `${doc.progress}%` }}
                     />
                   </div>

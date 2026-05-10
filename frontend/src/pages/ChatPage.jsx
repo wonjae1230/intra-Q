@@ -49,13 +49,16 @@ function mapSourceFromApi(source, index) {
 
 function mapChatMessageFromApi(message) {
   const role = message?.role === "assistant" ? "ai" : message?.role;
+  const rawSources = Array.isArray(message?.sources) ? message.sources : [];
+  const sources = rawSources.map((s, i) => mapSourceFromApi(s, i));
+  const firstSource = sources[0];
 
   return {
     id: `history-${message.id}`,
     type: role === "system" ? "ai" : role,
     text: message?.content ?? "",
-    evidence: "",
-    sources: [],
+    evidence: firstSource ? `근거: ${firstSource.documentName} · p.${firstSource.page}` : "",
+    sources,
     createdAt: message?.created_at ?? null,
   };
 }

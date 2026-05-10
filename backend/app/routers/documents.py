@@ -112,9 +112,12 @@ async def upload_document(
 
     embedding_status = "success"
     embedding_message = None
+    # 파일명(확장자 제외)을 청크 앞에 prefix로 붙여 임베딩에 포함시킴.
+    # 파일명에만 있는 문서 식별 키워드(예: '인초강', '강민준')가 벡터 검색에 반영되도록.
+    stem = document_row.file_name.rsplit(".", 1)[0]
     embedding_payload = [
         {
-            "content": chunk["content"],
+            "content": f"[{stem}]\n{chunk['content']}",
             "document_id": document_row.id,
             "file_name": document_row.file_name,
             "page": chunk["page_number"],

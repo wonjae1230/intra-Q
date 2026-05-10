@@ -203,6 +203,7 @@ class SessionChatMessage(BaseModel):
     content: str
     created_at: datetime
     latency_ms: int | None = None
+    sources: list[SourceItem] = Field(default_factory=list)
 
 
 class ChatSessionMessagesResponse(ApiResponseBase):
