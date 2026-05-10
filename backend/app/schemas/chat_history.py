@@ -15,6 +15,7 @@ class ChatMessageResponse(BaseModel):
     """Serialized chat message used by the history APIs."""
 
     id: int
+    session_id: int | None = None
     role: ChatRole
     content: str
     content_length: int

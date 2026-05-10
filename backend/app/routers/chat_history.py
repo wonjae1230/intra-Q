@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 @router.get(
     "",
     response_model=ChatHistoryResponse,
-    summary="List chat history",
-    description="Return stored chat messages in chronological order with paging support.",
+    summary="List chat history (deprecated)",
+    description="Deprecated compatibility endpoint. Prefer GET /api/chat/sessions/{session_id}/messages for session-scoped history.",
 )
 def get_chat_history(
     limit: int = Query(default=50, ge=1, le=100, description="한 번에 조회할 메시지 수"),
@@ -48,8 +48,8 @@ def get_chat_history(
 @router.delete(
     "",
     response_model=ChatHistoryDeleteResponse,
-    summary="Delete chat history",
-    description="Delete all stored chat messages so the frontend can reset the conversation state.",
+    summary="Delete all chat history (deprecated)",
+    description="Deprecated compatibility endpoint. Deletes all current-user chat sessions and messages.",
 )
 def clear_chat_history(
     db: Session = Depends(get_db),

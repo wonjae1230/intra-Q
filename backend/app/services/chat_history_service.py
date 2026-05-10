@@ -9,7 +9,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.chat_message import ChatMessage
-from app.schemas.chat import RecentChatMessage
+from app.models.chat_session import ChatSession
+from app.schemas.chat import RecentChatMessage, SessionChatMessage
 from app.schemas.chat_history import ChatMessageResponse
 
 
@@ -76,6 +77,7 @@ def _prepare_content_for_role(role: ChatRole, content: str) -> tuple[str, int]:
 def _to_response_model(message: ChatMessage) -> ChatMessageResponse:
     return ChatMessageResponse(
         id=message.id,
+        session_id=message.session_id,
         role=message.role,
         content=message.content,
         content_length=message.content_length,
@@ -88,15 +90,29 @@ def _to_response_model(message: ChatMessage) -> ChatMessageResponse:
 def _to_recent_response_model(message: ChatMessage) -> RecentChatMessage:
     return RecentChatMessage(
         id=message.id,
+        session_id=message.session_id,
         role=message.role,
         content=message.content,
         created_at=message.created_at,
+        latency_ms=message.latency_ms,
+    )
+
+
+def _to_session_response_model(message: ChatMessage) -> SessionChatMessage:
+    return SessionChatMessage(
+        id=message.id,
+        session_id=message.session_id,
+        role=message.role,
+        content=message.content,
+        created_at=message.created_at,
+        latency_ms=message.latency_ms,
     )
 
 
 def save_chat_message(
     db: Session,
     user_id: int,
+    session_id: int,
     role: ChatRole,
     content: str,
     document_ids: list[int] | None = None,
@@ -107,6 +123,7 @@ def save_chat_message(
     cleaned_content, content_length = _prepare_content_for_role(role, content)
     message_row = ChatMessage(
         user_id=user_id,
+        session_id=session_id,
         role=role,
         content=cleaned_content,
         content_length=content_length,
@@ -124,8 +141,9 @@ def save_chat_message(
         raise
 
     logger.info(
-        "Chat message saved: id=%s, role=%s, content_length=%s, has_document_ids=%s",
+        "Chat message saved: id=%s, session_id=%s, role=%s, content_length=%s, has_document_ids=%s",
         message_row.id,
+        session_id,
         role,
         message_row.content_length,
         document_ids is not None,
@@ -133,18 +151,33 @@ def save_chat_message(
     return message_row
 
 
-def save_user_message(db: Session, user_id: int, content: str, document_ids: list[int] | None = None) -> ChatMessage:
-    return save_chat_message(db, user_id, "user", content, document_ids=document_ids, latency_ms=None)
+def save_user_message(
+    db: Session,
+    user_id: int,
+    session_id: int,
+    content: str,
+    document_ids: list[int] | None = None,
+) -> ChatMessage:
+    return save_chat_message(db, user_id, session_id, "user", content, document_ids=document_ids, latency_ms=None)
 
 
 def save_assistant_message(
     db: Session,
     user_id: int,
+    session_id: int,
     content: str,
     document_ids: list[int] | None = None,
     latency_ms: int | None = None,
 ) -> ChatMessage:
-    return save_chat_message(db, user_id, "assistant", content, document_ids=document_ids, latency_ms=latency_ms)
+    return save_chat_message(
+        db,
+        user_id,
+        session_id,
+        "assistant",
+        content,
+        document_ids=document_ids,
+        latency_ms=latency_ms,
+    )
 
 
 def list_chat_history(
@@ -182,11 +215,21 @@ def list_recent_chat_history(
     user_id: int,
     limit: int = 50,
 ) -> list[RecentChatMessage]:
-    """Return the current user's latest messages, displayed oldest-to-newest."""
+    """Return messages from the user's most recently updated session."""
+
+    latest_session = (
+        db.query(ChatSession)
+        .filter(ChatSession.user_id == user_id)
+        .order_by(ChatSession.updated_at.desc(), ChatSession.id.desc())
+        .first()
+    )
+    if latest_session is None:
+        logger.info("Recent chat history retrieved: user_id=%s, limit=%s, rows=0", user_id, limit)
+        return []
 
     rows = (
         db.query(ChatMessage)
-        .filter(ChatMessage.user_id == user_id)
+        .filter(ChatMessage.user_id == user_id, ChatMessage.session_id == latest_session.id)
         # Fetch the newest rows first so the database only scans the requested recent window.
         .order_by(desc(ChatMessage.created_at), ChatMessage.id.desc())
         .limit(limit)
@@ -194,15 +237,53 @@ def list_recent_chat_history(
     )
     rows.reverse()
 
-    logger.info("Recent chat history retrieved: user_id=%s, limit=%s, rows=%s", user_id, limit, len(rows))
+    logger.info(
+        "Recent chat history retrieved: user_id=%s, session_id=%s, limit=%s, rows=%s",
+        user_id,
+        latest_session.id,
+        limit,
+        len(rows),
+    )
     return [_to_recent_response_model(row) for row in rows]
 
 
+def list_session_messages(
+    db: Session,
+    user_id: int,
+    session_id: int,
+    limit: int = 50,
+    offset: int = 0,
+    order: Literal["asc", "desc"] = "asc",
+) -> list[SessionChatMessage]:
+    """Return messages from one session after the caller verifies ownership."""
+    sort_order = asc(ChatMessage.created_at) if order == "asc" else desc(ChatMessage.created_at)
+    secondary_order = ChatMessage.id.asc() if order == "asc" else ChatMessage.id.desc()
+    rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.user_id == user_id, ChatMessage.session_id == session_id)
+        .order_by(sort_order, secondary_order)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    logger.info(
+        "Session messages retrieved: user_id=%s, session_id=%s, limit=%s, offset=%s, order=%s, rows=%s",
+        user_id,
+        session_id,
+        limit,
+        offset,
+        order,
+        len(rows),
+    )
+    return [_to_session_response_model(row) for row in rows]
+
+
 def delete_chat_history(db: Session, user_id: int) -> int:
-    """Delete all stored chat messages and return the affected row count."""
+    """Delete all current-user sessions and messages for the deprecated history reset API."""
 
     try:
         deleted_count = db.query(ChatMessage).filter(ChatMessage.user_id == user_id).delete(synchronize_session=False)
+        db.query(ChatSession).filter(ChatSession.user_id == user_id).delete(synchronize_session=False)
         db.commit()
     except SQLAlchemyError as exc:
         db.rollback()

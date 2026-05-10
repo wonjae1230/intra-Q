@@ -107,11 +107,12 @@ export async function clarifyQuestion(question, documentIds = []) {
   });
 }
 
-export async function askQuestion(question, documentIds = [], approachHint = null) {
+export async function askQuestion(sessionId, question, documentIds = [], approachHint = null) {
   return request("/api/chat", {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
+      session_id: sessionId,
       question,
       document_ids: documentIds,
       ...(approachHint ? { approach_hint: approachHint } : {}),
@@ -123,6 +124,48 @@ export async function getRecentChatMessages(limit = 50) {
   const params = new URLSearchParams({ limit: String(limit) });
   return request(`/api/chat/recent?${params.toString()}`, {
     method: "GET",
+    headers: authHeaders(),
+  });
+}
+
+export async function createChatSession(title) {
+  return request("/api/chat/sessions", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(title ? { title } : {}),
+  });
+}
+
+export async function getChatSessions() {
+  return request("/api/chat/sessions", {
+    method: "GET",
+    headers: authHeaders(),
+  });
+}
+
+export async function getChatSessionMessages(sessionId, { limit = 50, offset = 0, order = "asc" } = {}) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+    order,
+  });
+  return request(`/api/chat/sessions/${sessionId}/messages?${params.toString()}`, {
+    method: "GET",
+    headers: authHeaders(),
+  });
+}
+
+export async function updateChatSession(sessionId, title) {
+  return request(`/api/chat/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ title }),
+  });
+}
+
+export async function deleteChatSession(sessionId) {
+  return request(`/api/chat/sessions/${sessionId}`, {
+    method: "DELETE",
     headers: authHeaders(),
   });
 }

@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.session import Base
 from app.models.chat_message import ChatMessage
+from app.models.chat_session import ChatSession
 from app.models.user import User
 from app.services.chat_history_service import list_recent_chat_history
 
@@ -22,11 +23,16 @@ def test_list_recent_chat_history_limits_latest_rows_and_returns_ascending_order
         other_user = User(email="other@example.com", nickname="Other User", password_hash="hashed")
         db.add_all([user, other_user])
         db.flush()
+        session = ChatSession(user_id=user.id, title="Recent Session")
+        other_session = ChatSession(user_id=other_user.id, title="Other Session")
+        db.add_all([session, other_session])
+        db.flush()
 
         base_time = datetime(2026, 5, 10, 12, 30, 0)
         messages = [
             ChatMessage(
                 user_id=user.id,
+                session_id=session.id,
                 role="user",
                 content=f"user message {index}",
                 content_length=len(f"user message {index}"),
@@ -37,6 +43,7 @@ def test_list_recent_chat_history_limits_latest_rows_and_returns_ascending_order
         messages.append(
             ChatMessage(
                 user_id=other_user.id,
+                session_id=other_session.id,
                 role="assistant",
                 content="other user message",
                 content_length=len("other user message"),
