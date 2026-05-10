@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.common import ApiResponseBase
+
+ChatRole = Literal["user", "assistant", "system"]
 
 
 class ChatRequest(BaseModel):
@@ -82,3 +87,18 @@ class ClarifyData(BaseModel):
 
 class ClarifyResponse(ApiResponseBase):
     data: ClarifyData
+
+
+class RecentChatMessage(BaseModel):
+    """A compact stored chat message used to restore the current user's chat screen."""
+
+    id: int
+    role: ChatRole
+    content: str
+    created_at: datetime
+
+
+class RecentChatResponse(ApiResponseBase):
+    """Envelope for the recent chat history restore API."""
+
+    data: list[RecentChatMessage] = Field(default_factory=list)

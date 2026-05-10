@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -10,8 +10,16 @@ from app.core.dependencies import get_current_user
 from app.database.session import get_db
 from app.models.document import Document
 from app.models.user import User
-from app.schemas.chat import ChatData, ChatRequest, ChatResponse, ClarifyData, ClarifyOption, ClarifyResponse
-from app.services.chat_history_service import save_assistant_message, save_user_message
+from app.schemas.chat import (
+    ChatData,
+    ChatRequest,
+    ChatResponse,
+    ClarifyData,
+    ClarifyOption,
+    ClarifyResponse,
+    RecentChatResponse,
+)
+from app.services.chat_history_service import list_recent_chat_history, save_assistant_message, save_user_message
 from app.services.chat_service import generate_chat_response
 from rag.pipeline import search_with_options
 
@@ -42,6 +50,36 @@ def _resolve_user_document_ids(db: Session, user_id: int, requested_ids: list[in
         raise HTTPException(status_code=403, detail="해당 문서에 접근할 권한이 없습니다.")
 
     return requested_ids
+
+
+@router.get(
+    "/recent",
+    response_model=RecentChatResponse,
+    summary="Get recent chat history",
+    description=(
+        "Return the current authenticated user's latest chat messages for restoring the single chat screen. "
+        "The database query fetches the newest messages first, then the response is returned in chronological order."
+    ),
+)
+def get_recent_chat_history(
+    limit: int = Query(default=50, ge=1, le=100, description="최근 조회할 메시지 수, 최대 100개"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> RecentChatResponse:
+    """Return recent stored messages for the logged-in user's single chat view."""
+    logger.info("Recent chat history request received: user_id=%s, limit=%s", current_user.id, limit)
+    try:
+        history = list_recent_chat_history(db, user_id=current_user.id, limit=limit)
+        logger.info("Recent chat history query succeeded: user_id=%s, rows=%s", current_user.id, len(history))
+        return RecentChatResponse(message="Recent chat history retrieved successfully", data=history)
+    except SQLAlchemyError as exc:
+        logger.error("Recent chat history DB error: user_id=%s, error=%s", current_user.id, exc, exc_info=True)
+        raise HTTPException(status_code=503, detail="DB 조회 실패") from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Recent chat history server error: user_id=%s", current_user.id)
+        raise HTTPException(status_code=500, detail="내부 서버 오류") from exc
 
 
 @router.post(

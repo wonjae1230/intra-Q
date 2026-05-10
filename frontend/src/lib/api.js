@@ -119,4 +119,12 @@ export async function askQuestion(question, documentIds = [], approachHint = nul
   });
 }
 
+export async function getRecentChatMessages(limit = 50) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return request(`/api/chat/recent?${params.toString()}`, {
+    method: "GET",
+    headers: authHeaders(),
+  });
+}
+
 export { API_BASE_URL };

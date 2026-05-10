@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.chat_message import ChatMessage
+from app.schemas.chat import RecentChatMessage
 from app.schemas.chat_history import ChatMessageResponse
 
 
@@ -81,6 +82,15 @@ def _to_response_model(message: ChatMessage) -> ChatMessageResponse:
         created_at=message.created_at,
         document_ids=_deserialize_document_ids(message.document_ids),
         latency_ms=message.latency_ms,
+    )
+
+
+def _to_recent_response_model(message: ChatMessage) -> RecentChatMessage:
+    return RecentChatMessage(
+        id=message.id,
+        role=message.role,
+        content=message.content,
+        created_at=message.created_at,
     )
 
 
@@ -165,6 +175,27 @@ def list_chat_history(
         len(rows),
     )
     return [_to_response_model(row) for row in rows]
+
+
+def list_recent_chat_history(
+    db: Session,
+    user_id: int,
+    limit: int = 50,
+) -> list[RecentChatMessage]:
+    """Return the current user's latest messages, displayed oldest-to-newest."""
+
+    rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.user_id == user_id)
+        # Fetch the newest rows first so the database only scans the requested recent window.
+        .order_by(desc(ChatMessage.created_at), ChatMessage.id.desc())
+        .limit(limit)
+        .all()
+    )
+    rows.reverse()
+
+    logger.info("Recent chat history retrieved: user_id=%s, limit=%s, rows=%s", user_id, limit, len(rows))
+    return [_to_recent_response_model(row) for row in rows]
 
 
 def delete_chat_history(db: Session, user_id: int) -> int:

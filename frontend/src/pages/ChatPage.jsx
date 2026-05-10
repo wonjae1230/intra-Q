@@ -9,7 +9,7 @@ import {
   PdfIcon,
   StatusBadge,
 } from "../components/ui";
-import { askQuestion, clarifyQuestion, getDocuments } from "../lib/api";
+import { askQuestion, clarifyQuestion, getDocuments, getRecentChatMessages } from "../lib/api";
 
 function mapDocumentFromApi(item) {
   return {
@@ -35,6 +35,19 @@ function mapSourceFromApi(source, index) {
     page: source?.page ?? "-",
     score,
     text: source?.text || source?.preview || source?.content || "",
+  };
+}
+
+function mapRecentMessageFromApi(message) {
+  const role = message?.role === "assistant" ? "ai" : message?.role;
+
+  return {
+    id: `history-${message.id}`,
+    type: role === "system" ? "ai" : role,
+    text: message?.content ?? "",
+    evidence: "",
+    sources: [],
+    createdAt: message?.created_at ?? null,
   };
 }
 
@@ -182,6 +195,35 @@ export default function ChatPage() {
     };
 
     loadDocuments();
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadRecentChatHistory = async () => {
+      try {
+        const response = await getRecentChatMessages(50);
+        const rows = response?.data ?? [];
+
+        if (!Array.isArray(rows)) {
+          throw new Error("최근 채팅 기록 응답 형식이 올바르지 않습니다.");
+        }
+
+        if (isActive) {
+          setMessages((prev) => (prev.length === 0 ? rows.map(mapRecentMessageFromApi) : prev));
+        }
+      } catch (error) {
+        if (isActive) {
+          setLoadError(error.message);
+        }
+      }
+    };
+
+    loadRecentChatHistory();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -407,6 +449,12 @@ export default function ChatPage() {
     }
   };
 
+  const handleStartNewSession = () => {
+    setMessages([]);
+    setQuestion("");
+    setSessionDocumentIds(null);
+  };
+
   return (
     <AppLayout>
       <PageShell direction="row">
@@ -503,6 +551,15 @@ export default function ChatPage() {
             <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] font-semibold text-blue-600">
               {activeDocuments.length}개 문서 사용 중
             </span>
+
+            <button
+              type="button"
+              onClick={handleStartNewSession}
+              disabled={isSending}
+              className="h-10 rounded-xl border border-slate-300 bg-white px-4 text-[13px] font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              새 세션에서 질문하기
+            </button>
           </header>
 
           <Panel className="flex min-h-0 flex-1 flex-col gap-[18px] p-6">
