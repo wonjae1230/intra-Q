@@ -646,15 +646,11 @@ export default function ChatPage() {
       setChatSessions(remaining);
 
       if (activeSessionId === sessionId) {
-        if (remaining.length > 0) {
-          await openChatSession(remaining[0].id);
-        } else {
-          setActiveSessionId(null);
-          setMessages([]);
-          setChatView("list");
-          await handleStartNewSession();
-        }
+        setActiveSessionId(remaining[0]?.id ?? null);
+        setMessages([]);
+        setSessionDocumentIds(null);
       }
+      setChatView("list");
     } catch (error) {
       setLoadError(error.message);
     }
@@ -760,15 +756,6 @@ export default function ChatPage() {
             <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] font-semibold text-blue-600">
               {activeDocuments.length}개 문서 사용 중
             </span>
-
-            <button
-              type="button"
-              onClick={handleStartNewSession}
-              disabled={isSending}
-              className="h-10 rounded-xl border border-slate-300 bg-white px-4 text-[13px] font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              새 세션에서 질문하기
-            </button>
           </header>
 
           {chatView === "list" ? (
@@ -784,7 +771,7 @@ export default function ChatPage() {
                   type="button"
                   onClick={handleStartNewSession}
                   disabled={isSending}
-                  className="h-9 rounded-xl bg-blue-600 px-4 text-[13px] font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="h-9 min-w-[112px] rounded-xl bg-blue-600 px-5 text-[13px] font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   새 세션
                 </button>
