@@ -24,6 +24,7 @@ class ChatMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     document_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sources: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped[User | None] = relationship()
     session: Mapped[ChatSession] = relationship(back_populates="messages")

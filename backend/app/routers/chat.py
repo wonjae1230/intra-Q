@@ -333,6 +333,7 @@ def chat(
                 chat_data.answer,
                 document_ids=document_ids,
                 latency_ms=chat_data.latency_ms,
+                sources=[s.model_dump() for s in chat_data.sources],
             )
             touch_chat_session(db, user_id=current_user.id, session_id=request.session_id)
             logger.info(

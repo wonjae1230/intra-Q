@@ -99,6 +99,13 @@ def _to_recent_response_model(message: ChatMessage) -> RecentChatMessage:
 
 
 def _to_session_response_model(message: ChatMessage) -> SessionChatMessage:
+    sources = []
+    if message.sources:
+        try:
+            raw = json.loads(message.sources)
+            sources = raw if isinstance(raw, list) else []
+        except json.JSONDecodeError:
+            pass
     return SessionChatMessage(
         id=message.id,
         session_id=message.session_id,
@@ -106,6 +113,7 @@ def _to_session_response_model(message: ChatMessage) -> SessionChatMessage:
         content=message.content,
         created_at=message.created_at,
         latency_ms=message.latency_ms,
+        sources=sources,
     )
 
 
@@ -168,8 +176,9 @@ def save_assistant_message(
     content: str,
     document_ids: list[int] | None = None,
     latency_ms: int | None = None,
+    sources: list[dict] | None = None,
 ) -> ChatMessage:
-    return save_chat_message(
+    message = save_chat_message(
         db,
         user_id,
         session_id,
@@ -178,6 +187,13 @@ def save_assistant_message(
         document_ids=document_ids,
         latency_ms=latency_ms,
     )
+    if sources:
+        try:
+            message.sources = json.dumps(sources, ensure_ascii=False)
+            db.commit()
+        except Exception:
+            db.rollback()
+    return message
 
 
 def list_chat_history(

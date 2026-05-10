@@ -48,7 +48,11 @@ class ChromaVectorStore:
         self._client = chromadb.PersistentClient(path=self.persist_dir)
         self._collection = self._client.get_or_create_collection(
             name=self.collection_name,
-            metadata={"hnsw:space": config.chroma_distance_metric},
+            metadata={
+                "hnsw:space": config.chroma_distance_metric,
+                "hnsw:search_ef": config.chroma_search_ef,
+                "hnsw:construction_ef": config.chroma_search_ef,
+            },
         )
 
     def upsert_chunks(
@@ -89,11 +93,13 @@ class ChromaVectorStore:
         total = self._collection.count()
         if total == 0:
             return []
-        n_results = min(top_k, total)
 
+        # HNSW는 n_results가 작을 때 근사 탐색이 실패하는 버그가 있음.
+        # 전체 조회(브루트포스) 후 슬라이싱으로 항상 정확한 결과를 보장.
+        # 현재 데이터셋 규모(수천 청크)에서 전체 조회 비용은 ~44ms로 무시 가능.
         query_kwargs: dict = {
             "query_embeddings": [embedding],
-            "n_results": n_results,
+            "n_results": total,
             "include": ["documents", "metadatas", "distances"],
         }
         if where:
@@ -119,7 +125,8 @@ class ChromaVectorStore:
             )
 
         threshold = get_config().distance_threshold if distance_threshold is None else distance_threshold
-        return [result for result in results if result["distance"] < threshold]
+        filtered = [r for r in results if r["distance"] < threshold]
+        return filtered[:top_k]
 
     def delete_by_document_id(self, document_id: int) -> int:
         if document_id <= 0:

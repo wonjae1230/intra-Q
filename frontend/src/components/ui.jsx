@@ -18,13 +18,15 @@ export function PdfIcon({ size = "md" }) {
 }
 
 export function StatusBadge({ status }) {
-  const tone = status.includes("완료")
-    ? "bg-emerald-50 text-emerald-600"
-    : status.includes("텍스트")
-      ? "bg-amber-50 text-amber-600"
-      : status.includes("중")
-        ? "bg-blue-50 text-blue-600"
-        : "bg-slate-100 text-slate-600";
+  const tone = status.includes("실패")
+    ? "bg-red-50 text-red-600"
+    : status.includes("완료")
+      ? "bg-emerald-50 text-emerald-600"
+      : status.includes("텍스트")
+        ? "bg-amber-50 text-amber-600"
+        : status.includes("중")
+          ? "bg-blue-50 text-blue-600"
+          : "bg-slate-100 text-slate-600";
 
   return (
     <span
