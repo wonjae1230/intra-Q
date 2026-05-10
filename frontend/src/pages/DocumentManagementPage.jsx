@@ -34,6 +34,8 @@ export default function DocumentManagementPage() {
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterStatus, setFilterStatus] = useState("전체");
   const [loadError, setLoadError] = useState("");
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filterButtons = ["전체", "처리 완료", "처리 중"];
 
@@ -72,6 +74,49 @@ export default function DocumentManagementPage() {
     });
   }, [documents, searchKeyword, filterStatus]);
 
+  const filteredDocumentIds = useMemo(
+    () => filteredDocuments.map((doc) => doc.id),
+    [filteredDocuments]
+  );
+
+  const selectedCount = selectedDocumentIds.length;
+  const allFilteredSelected =
+    filteredDocumentIds.length > 0 &&
+    filteredDocumentIds.every((id) => selectedDocumentIds.includes(id));
+
+  const deleteDocumentsByIds = async (documentIds) => {
+    if (documentIds.length === 0 || isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const results = await Promise.allSettled(
+        documentIds.map((documentId) => deleteDocument(documentId))
+      );
+      const deletedIds = documentIds.filter(
+        (_, index) => results[index].status === "fulfilled"
+      );
+      const failedCount = results.length - deletedIds.length;
+
+      if (deletedIds.length > 0) {
+        setDocuments((prevDocuments) =>
+          prevDocuments.filter((doc) => !deletedIds.includes(doc.id))
+        );
+        setSelectedDocumentIds((prevSelectedIds) =>
+          prevSelectedIds.filter((id) => !deletedIds.includes(id))
+        );
+      }
+
+      if (failedCount > 0) {
+        alert(`${failedCount}개 문서 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.`);
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleDeleteDocument = async (documentId) => {
     const confirmed = window.confirm("이 문서를 삭제하시겠습니까?");
 
@@ -79,15 +124,51 @@ export default function DocumentManagementPage() {
       return;
     }
 
-    try {
-      await deleteDocument(documentId);
+    await deleteDocumentsByIds([documentId]);
+  };
 
-      setDocuments((prevDocuments) =>
-        prevDocuments.filter((doc) => doc.id !== documentId)
-      );
-    } catch (error) {
-      alert(`문서 삭제에 실패했습니다: ${error.message}`);
+  const handleToggleDocument = (documentId) => {
+    setSelectedDocumentIds((prevSelectedIds) => {
+      if (prevSelectedIds.includes(documentId)) {
+        return prevSelectedIds.filter((id) => id !== documentId);
+      }
+
+      return [...prevSelectedIds, documentId];
+    });
+  };
+
+  const handleToggleAllFiltered = () => {
+    setSelectedDocumentIds((prevSelectedIds) => {
+      if (allFilteredSelected) {
+        return prevSelectedIds.filter((id) => !filteredDocumentIds.includes(id));
+      }
+
+      return Array.from(new Set([...prevSelectedIds, ...filteredDocumentIds]));
+    });
+  };
+
+  const handleDeleteSelected = async () => {
+    const confirmed = window.confirm(
+      `선택한 ${selectedCount}개 문서를 삭제하시겠습니까?`
+    );
+
+    if (!confirmed) {
+      return;
     }
+
+    await deleteDocumentsByIds(selectedDocumentIds);
+  };
+
+  const handleDeleteAll = async () => {
+    const confirmed = window.confirm(
+      `전체 ${documents.length}개 문서를 모두 삭제하시겠습니까?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await deleteDocumentsByIds(documents.map((doc) => doc.id));
   };
 
   return (
@@ -141,10 +222,40 @@ export default function DocumentManagementPage() {
               );
             })}
           </div>
+
+          <div className="flex h-[46px] items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDeleteSelected}
+              disabled={selectedCount === 0 || isDeleting}
+              className="h-full rounded-[12px] border border-red-200 bg-white px-3.5 text-[13px] font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              선택 삭제 {selectedCount > 0 ? `${selectedCount}` : ""}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDeleteAll}
+              disabled={documents.length === 0 || isDeleting}
+              className="h-full rounded-[12px] bg-red-600 px-3.5 text-[13px] font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              전체 삭제
+            </button>
+          </div>
         </Panel>
 
         <Panel className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="grid h-[54px] shrink-0 grid-cols-[360px_170px_100px_100px_140px_1fr] items-center gap-3 bg-slate-50 px-[18px] text-xs font-bold text-slate-500">
+          <div className="grid h-[54px] shrink-0 grid-cols-[42px_340px_160px_90px_90px_130px_1fr] items-center gap-3 bg-slate-50 px-[18px] text-xs font-bold text-slate-500">
+            <div className="flex items-center justify-center">
+              <input
+                type="checkbox"
+                checked={allFilteredSelected}
+                disabled={filteredDocuments.length === 0 || isDeleting}
+                onChange={handleToggleAllFiltered}
+                aria-label="현재 목록 전체 선택"
+                className="h-4 w-4 rounded border-slate-300 accent-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+              />
+            </div>
             <div>문서명</div>
             <div>업로드 날짜</div>
             <div>페이지 수</div>
@@ -161,12 +272,23 @@ export default function DocumentManagementPage() {
                 return (
                   <div
                     key={doc.id}
-                    className={`grid h-[76px] grid-cols-[360px_170px_100px_100px_140px_1fr] items-center gap-3 px-[18px] ${
+                    className={`grid h-[76px] grid-cols-[42px_340px_160px_90px_90px_130px_1fr] items-center gap-3 px-[18px] ${
                       index !== filteredDocuments.length - 1
                         ? "border-b border-slate-200"
                         : ""
                     }`}
                   >
+                    <div className="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedDocumentIds.includes(doc.id)}
+                        disabled={isDeleting}
+                        onChange={() => handleToggleDocument(doc.id)}
+                        aria-label={`${doc.name} 선택`}
+                        className="h-4 w-4 rounded border-slate-300 accent-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+                      />
+                    </div>
+
                     <div className="flex min-w-0 items-center gap-2.5">
                       <PdfIcon />
                       <div className="min-w-0">
