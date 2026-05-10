@@ -646,15 +646,11 @@ export default function ChatPage() {
       setChatSessions(remaining);
 
       if (activeSessionId === sessionId) {
-        if (remaining.length > 0) {
-          await openChatSession(remaining[0].id);
-        } else {
-          setActiveSessionId(null);
-          setMessages([]);
-          setChatView("list");
-          await handleStartNewSession();
-        }
+        setActiveSessionId(remaining[0]?.id ?? null);
+        setMessages([]);
+        setSessionDocumentIds(null);
       }
+      setChatView("list");
     } catch (error) {
       setLoadError(error.message);
     }
