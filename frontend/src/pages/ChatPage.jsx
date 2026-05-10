@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 
 import {
   AppLayout,
@@ -8,7 +9,7 @@ import {
   PdfIcon,
   StatusBadge,
 } from "../components/ui";
-import { askQuestion, getDocuments } from "../lib/api";
+import { askQuestion, clarifyQuestion, getDocuments } from "../lib/api";
 
 function mapDocumentFromApi(item) {
   return {
@@ -37,6 +38,114 @@ function mapSourceFromApi(source, index) {
   };
 }
 
+function ContextRequestMessage({ message, onSubmitContext, disabled }) {
+  const [contextInput, setContextInput] = useState("");
+
+  const handleSubmit = () => {
+    if (!contextInput.trim() || disabled) return;
+    onSubmitContext(message.id, message.originalQuestion, contextInput.trim());
+  };
+
+  return (
+    <div className="flex gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 font-mono text-[13px] font-extrabold text-white">
+        AI
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3">
+        <div className="rounded-[18px] rounded-bl border border-slate-200 bg-slate-50 px-[18px] py-4">
+          <p className="text-[15px] leading-relaxed">{message.contextQuestion}</p>
+        </div>
+
+        {!message.answered && (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={contextInput}
+              onChange={(e) => setContextInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              disabled={disabled}
+              placeholder="예: 소프트웨어융합학과 3학년"
+              className="flex-1 rounded-[14px] border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-400 disabled:opacity-60 placeholder:text-slate-400"
+            />
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!contextInput.trim() || disabled}
+              className="h-10 rounded-[14px] bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              확인
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ClarifyMessage({ message, onSelectOption, onSubmit, disabled }) {
+  const hasSelection = message.selectedId !== null;
+
+  return (
+    <div className="flex gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 font-mono text-[13px] font-extrabold text-white">
+        AI
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3">
+        <div className="rounded-[18px] rounded-bl border border-slate-200 bg-slate-50 px-[18px] py-4">
+          <p className="text-[15px] leading-relaxed">
+            질문을 분석했습니다. 어떤 방향으로 답변할까요?
+          </p>
+          <p className="mt-1 text-xs text-slate-500">하나를 선택하면 그 관점에 맞게 답변드립니다.</p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {message.options.map((opt) => {
+            const isSelected = message.selectedId === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => !message.answered && onSelectOption(message.id, opt.id)}
+                disabled={message.answered || disabled}
+                className={`rounded-2xl border p-3.5 text-left transition ${
+                  isSelected
+                    ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
+                    : "border-slate-200 bg-white hover:bg-slate-50"
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${isSelected ? "border-blue-500 bg-blue-500" : "border-slate-300"}`}>
+                    {isSelected && <span className="h-2 w-2 rounded-full bg-white" />}
+                  </span>
+                  <p className="text-[14px] font-bold leading-snug">{opt.label}</p>
+                </div>
+                {opt.description && (
+                  <p className="mt-1.5 pl-7 text-xs leading-relaxed text-slate-500">
+                    {opt.description}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {!message.answered && (
+          <button
+            type="button"
+            onClick={() => onSubmit(message.id, message.question, message.selectedId, message.documentIds)}
+            disabled={!hasSelection || disabled}
+            className="h-10 w-full rounded-[14px] bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {hasSelection ? "이 방향으로 답변받기" : "방향을 선택하세요"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const navigate = useNavigate();
   const messageEndRef = useRef(null);
@@ -46,6 +155,7 @@ export default function ChatPage() {
   const [documents, setDocuments] = useState([]);
   const [isSending, setIsSending] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [sessionDocumentIds, setSessionDocumentIds] = useState(null);
 
   const wait = (ms) =>
     new Promise((resolve) => {
@@ -84,54 +194,70 @@ export default function ChatPage() {
 
   const handleSendMessage = async () => {
     const trimmedQuestion = question.trim();
+    if (!trimmedQuestion || isSending) return;
 
-    if (!trimmedQuestion || isSending) {
+    const userMessage = { id: Date.now(), type: "user", text: trimmedQuestion };
+    setMessages((prev) => [...prev, userMessage]);
+    setQuestion("");
+    setIsSending(true);
+
+    // 이미 문서가 선택된 대화 세션이면 clarify 없이 바로 답변
+    if (sessionDocumentIds !== null) {
+      await _fetchAnswer(trimmedQuestion, sessionDocumentIds);
       return;
     }
 
-    const userMessage = {
-      id: Date.now(),
-      type: "user",
-      text: trimmedQuestion,
-    };
-
-    setMessages((prevMessages) => [...prevMessages, userMessage]);
-    setQuestion("");
-    setIsSending(true);
-    const minLoadingDelay = wait(1200);
-
     try {
-      const response = await askQuestion(
+      const response = await clarifyQuestion(
         trimmedQuestion,
         activeDocuments.map((doc) => doc.id)
       );
 
-      await minLoadingDelay;
+      const clarifyData = response?.data ?? {};
+      const options = clarifyData.options ?? [];
+      const returnedDocumentIds = clarifyData.document_ids ?? activeDocuments.map((doc) => doc.id);
+      const contextQuestion = clarifyData.context_question ?? null;
 
-      const chatData = response?.data ?? response ?? {};
-      const sources = Array.isArray(chatData.sources)
-        ? chatData.sources.map(mapSourceFromApi)
-        : [];
+      // AI needs more context from the user
+      if (contextQuestion) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 1,
+            type: "context_request",
+            originalQuestion: trimmedQuestion,
+            contextQuestion,
+            documentIds: returnedDocumentIds,
+            answered: false,
+          },
+        ]);
+        setIsSending(false);
+        return;
+      }
 
-      const firstSource = sources[0];
+      // LLM decided the question is simple — skip clarify and answer directly
+      if (options.length === 0) {
+        setSessionDocumentIds(returnedDocumentIds);
+        await _fetchAnswer(trimmedQuestion, returnedDocumentIds);
+        return;
+      }
 
-      setMessages((prevMessages) => [
-        ...prevMessages,
+      setMessages((prev) => [
+        ...prev,
         {
           id: Date.now() + 1,
-          type: "ai",
-          text: chatData.answer || "답변이 비어 있습니다.",
-          evidence: firstSource
-            ? `근거: ${firstSource.documentName} · p.${firstSource.page}`
-            : "",
-          sources,
+          type: "clarify",
+          question: trimmedQuestion,
+          options,
+          selectedId: null,
+          documentIds: returnedDocumentIds,
+          answered: false,
         },
       ]);
+      setIsSending(false);
     } catch (error) {
-      await minLoadingDelay;
-
-      setMessages((prevMessages) => [
-        ...prevMessages,
+      setMessages((prev) => [
+        ...prev,
         {
           id: Date.now() + 1,
           type: "ai",
@@ -140,9 +266,139 @@ export default function ChatPage() {
           sources: [],
         },
       ]);
+      setIsSending(false);
+    }
+  };
+
+  const _fetchAnswer = async (q, documentIds, approachHint = null) => {
+    const minLoadingDelay = wait(1200);
+    try {
+      const response = await askQuestion(q, documentIds, approachHint);
+      await minLoadingDelay;
+
+      const chatData = response?.data ?? response ?? {};
+      const sources = Array.isArray(chatData.sources)
+        ? chatData.sources.map(mapSourceFromApi)
+        : [];
+      const firstSource = sources[0];
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "ai",
+          text: chatData.answer || "답변이 비어 있습니다.",
+          evidence: firstSource ? `근거: ${firstSource.documentName} · p.${firstSource.page}` : "",
+          sources,
+        },
+      ]);
+    } catch (error) {
+      await minLoadingDelay;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          type: "ai",
+          text: "답변 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+          evidence: error.message,
+          sources: [],
+        },
+      ]);
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleSubmitContext = async (messageId, originalQuestion, userContext) => {
+    if (isSending) return;
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, answered: true } : m))
+    );
+    // Enrich the original question with user-provided context and restart the flow
+    const enrichedQuestion = `${originalQuestion} (${userContext})`;
+    const userMsg = { id: Date.now(), type: "user", text: userContext };
+    setMessages((prev) => [...prev, userMsg]);
+    setIsSending(true);
+
+    try {
+      const response = await clarifyQuestion(
+        enrichedQuestion,
+        activeDocuments.map((doc) => doc.id)
+      );
+      const clarifyData = response?.data ?? {};
+      const options = clarifyData.options ?? [];
+      const returnedDocumentIds = clarifyData.document_ids ?? activeDocuments.map((doc) => doc.id);
+      const contextQuestion = clarifyData.context_question ?? null;
+
+      if (contextQuestion) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 1,
+            type: "context_request",
+            originalQuestion: enrichedQuestion,
+            contextQuestion,
+            documentIds: returnedDocumentIds,
+            answered: false,
+          },
+        ]);
+        setIsSending(false);
+        return;
+      }
+
+      if (options.length === 0) {
+        setSessionDocumentIds(returnedDocumentIds);
+        await _fetchAnswer(enrichedQuestion, returnedDocumentIds);
+        return;
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          type: "clarify",
+          question: enrichedQuestion,
+          options,
+          selectedId: null,
+          documentIds: returnedDocumentIds,
+          answered: false,
+        },
+      ]);
+      setIsSending(false);
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          type: "ai",
+          text: "질문 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+          evidence: error.message,
+          sources: [],
+        },
+      ]);
+      setIsSending(false);
+    }
+  };
+
+  const handleSelectOption = (messageId, optionId) => {
+    setMessages((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, selectedId: optionId } : msg))
+    );
+  };
+
+  const handleSubmitClarify = async (messageId, originalQuestion, selectedId, documentIds) => {
+    if (!selectedId || isSending) return;
+
+    const msg = messages.find((m) => m.id === messageId);
+    const selectedOption = msg?.options.find((o) => o.id === selectedId);
+    const approachHint = selectedOption ? `${selectedOption.label}: ${selectedOption.description}` : null;
+
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, answered: true } : m))
+    );
+    setSessionDocumentIds(documentIds);
+    setIsSending(true);
+    await _fetchAnswer(originalQuestion, documentIds, approachHint);
   };
 
   const handleKeyDown = (event) => {
@@ -269,6 +525,29 @@ export default function ChatPage() {
                   );
                 }
 
+                if (message.type === "context_request") {
+                  return (
+                    <ContextRequestMessage
+                      key={message.id}
+                      message={message}
+                      onSubmitContext={handleSubmitContext}
+                      disabled={isSending}
+                    />
+                  );
+                }
+
+                if (message.type === "clarify") {
+                  return (
+                    <ClarifyMessage
+                      key={message.id}
+                      message={message}
+                      onSelectOption={handleSelectOption}
+                      onSubmit={handleSubmitClarify}
+                      disabled={isSending}
+                    />
+                  );
+                }
+
                 return (
                   <div key={message.id} className="flex gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 font-mono text-[13px] font-extrabold text-white">
@@ -277,9 +556,9 @@ export default function ChatPage() {
 
                     <div className="flex flex-1 flex-col gap-3">
                       <div className="rounded-[18px] rounded-bl border border-slate-200 bg-slate-50 px-[18px] py-4">
-                        <p className="text-[15px] leading-relaxed">
-                          {message.text}
-                        </p>
+                        <div className="prose prose-sm max-w-none">
+                          <ReactMarkdown>{message.text}</ReactMarkdown>
+                        </div>
 
                         {message.evidence && (
                           <p className="mt-2.5 text-xs text-slate-500">
@@ -303,22 +582,19 @@ export default function ChatPage() {
                                 className="rounded-2xl border border-blue-200 bg-white p-3.5 text-left transition hover:bg-blue-50"
                               >
                                 <div className="flex items-center gap-2">
-                                  <p className="text-[13px] font-bold">
+                                  <p className="truncate text-[13px] font-bold">
                                     {source.documentName}
                                   </p>
                                   <div className="flex-1" />
-                                  <span className="rounded-full bg-blue-50 px-2 py-1 font-mono text-[11px] font-bold text-blue-600">
+                                  <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 font-mono text-[11px] font-bold text-blue-600">
                                     {source.score}
                                   </span>
-                                  <span className="font-mono text-base font-extrabold text-blue-600">
-                                    ›
-                                  </span>
+                                  <span className="font-mono text-base font-extrabold text-blue-600">›</span>
                                 </div>
-
-                                <p className="mt-2.5 font-mono text-xs font-bold text-slate-500">
+                                <p className="mt-2 font-mono text-xs font-bold text-slate-500">
                                   p. {source.page}
                                 </p>
-                                <p className="mt-2.5 text-xs leading-relaxed text-slate-600">
+                                <p className="mt-2 line-clamp-5 text-xs leading-relaxed text-slate-600">
                                   {source.text}
                                 </p>
                               </button>
@@ -340,7 +616,7 @@ export default function ChatPage() {
                   <div className="flex flex-1 flex-col gap-3">
                     <div className="rounded-[18px] rounded-bl border border-slate-200 bg-slate-50 px-[18px] py-4">
                       <p className="text-[15px] leading-relaxed text-slate-700">
-                        관련 문서를 찾고 답변을 생성하는 중입니다...
+                        관련 문서를 찾고 있습니다...
                       </p>
                       <div className="mt-3 flex items-center gap-1.5">
                         <span className="h-2 w-2 rounded-full bg-blue-500 animate-bounce [animation-delay:0ms]" />
@@ -354,6 +630,21 @@ export default function ChatPage() {
 
               <div ref={messageEndRef} />
             </div>
+
+            {sessionDocumentIds !== null && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">
+                  대화 세션 진행 중
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSessionDocumentIds(null)}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  새 질문 시작
+                </button>
+              </div>
+            )}
 
             <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3">
               <div className="flex h-12 flex-1 items-center gap-2.5 rounded-[14px] border border-slate-300 bg-white px-4">
@@ -373,7 +664,7 @@ export default function ChatPage() {
                 disabled={isSending}
                 className="h-12 w-28 rounded-[14px] bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSending ? "생성 중..." : "전송"}
+                {isSending ? "검색 중..." : "전송"}
               </button>
             </div>
 

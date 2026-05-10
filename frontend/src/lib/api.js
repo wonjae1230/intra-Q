@@ -99,13 +99,22 @@ export async function deleteDocument(documentId) {
   });
 }
 
-export async function askQuestion(question, documentIds = []) {
+export async function clarifyQuestion(question, documentIds = []) {
+  return request("/api/chat/clarify", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ question, document_ids: documentIds }),
+  });
+}
+
+export async function askQuestion(question, documentIds = [], approachHint = null) {
   return request("/api/chat", {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       question,
       document_ids: documentIds,
+      ...(approachHint ? { approach_hint: approachHint } : {}),
     }),
   });
 }

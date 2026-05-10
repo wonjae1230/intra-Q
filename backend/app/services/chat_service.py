@@ -4,7 +4,10 @@ import logging
 import time
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 from app.schemas.chat import ChatData, SourceItem
+from app.services.chat_history_service import list_chat_history
 from rag.pipeline import query as rag_query
 
 
@@ -56,6 +59,9 @@ def generate_chat_response(
     question: str,
     document_ids: list[int] | None = None,
     top_k: int | None = None,
+    db: Session | None = None,
+    user_id: int | None = None,
+    approach_hint: str | None = None,
 ) -> ChatData:
     """Generate a RAG response from the vector store and LLM pipeline."""
     started_at = time.perf_counter()
@@ -73,7 +79,17 @@ def generate_chat_response(
     if document_ids is not None:
         logger.info("Chat document filter requested: document_ids=%s", document_ids)
 
-    rag_result = rag_query(cleaned_question, top_k=top_k, document_ids=document_ids)
+    history: list[dict] = []
+    if db is not None and user_id is not None:
+        recent = list_chat_history(db, user_id, limit=6, order="desc")
+        recent.reverse()
+        history = [
+            {"role": msg.role, "content": msg.content}
+            for msg in recent
+            if msg.role in ("user", "assistant")
+        ]
+
+    rag_result = rag_query(cleaned_question, top_k=top_k, document_ids=document_ids, history=history, approach_hint=approach_hint)
     answer = str(rag_result.get("answer") or "")
     sources = [_map_source_item(source) for source in rag_result.get("sources", []) if isinstance(source, dict)]
 

@@ -11,6 +11,7 @@ class ChatRequest(BaseModel):
     question: str = Field(..., description="사용자 질문")
     document_ids: list[int] | None = Field(default=None, description="검색할 문서 ID 목록")
     top_k: int | None = Field(default=None, gt=0, description="검색 결과 개수")
+    approach_hint: str | None = Field(default=None, description="AI가 제시한 답변 방향 힌트")
 
     @field_validator("question")
     @classmethod
@@ -64,3 +65,20 @@ class ChatResponse(ApiResponseBase):
     """Envelope for chat API responses."""
 
     data: ChatData
+
+
+class ClarifyOption(BaseModel):
+    id: str
+    label: str
+    description: str
+
+
+class ClarifyData(BaseModel):
+    question: str
+    options: list[ClarifyOption]
+    document_ids: list[int] = Field(default_factory=list)
+    context_question: str | None = None
+
+
+class ClarifyResponse(ApiResponseBase):
+    data: ClarifyData

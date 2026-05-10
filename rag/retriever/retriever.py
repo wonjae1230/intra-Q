@@ -1,4 +1,4 @@
-"""Question-time retrieval over the Chroma vector store."""
+"""크로마 DB"""
 
 from __future__ import annotations
 
