@@ -65,13 +65,13 @@ def query(
     retriever = Retriever()
     generator = AnswerGenerator()
 
-    # 다양한 관점의 쿼리 변형 생성 (원본 포함)
+    final_top_k = top_k or config.top_k
+    fetch_k = final_top_k * config.reranker_fetch_multiplier if config.reranker_enabled else final_top_k
+
+    # 히스토리가 있으면 rewrite+variants를 단일 LLM 호출로 처리, 없으면 즉시 반환
     query_variants = generator.generate_query_variants(
         question, history or [], n=config.query_variants_count
     )
-
-    final_top_k = top_k or config.top_k
-    fetch_k = final_top_k * config.reranker_fetch_multiplier if config.reranker_enabled else final_top_k
 
     # 각 변형 쿼리로 검색 후 RRF 합산
     result_lists = [
@@ -82,9 +82,7 @@ def query(
 
     if config.reranker_enabled:
         reranker = VertexAIReranker()
-        # reranker에는 원본 질문 기준으로 재정렬
-        search_query = query_variants[0]
-        chunks = reranker.rerank(search_query, merged, top_n=config.reranker_top_n)
+        chunks = reranker.rerank(query_variants[0], merged, top_n=config.reranker_top_n)
     else:
         chunks = merged[:final_top_k]
 
@@ -105,12 +103,7 @@ def search_with_options(
     generator = AnswerGenerator()
 
     fetch_k = config.top_k * config.reranker_fetch_multiplier
-    query_variants = generator.generate_query_variants(question, [], n=config.query_variants_count)
-    result_lists = [
-        retriever.retrieve(q, top_k=fetch_k, document_ids=document_ids)
-        for q in query_variants
-    ]
-    chunks = _reciprocal_rank_fusion(result_lists)[:fetch_k]
+    chunks = retriever.retrieve(question, top_k=fetch_k, document_ids=document_ids)
 
     # Collect unique document_ids from retrieved chunks for the final chat call.
     seen_doc_ids: list[int] = []
