@@ -27,64 +27,38 @@ class AnswerGenerator:
         )
 
     def generate_query_variants(self, question: str, history: list[dict], n: int = 3) -> list[str]:
-        """원본 쿼리의 다양한 관점 변형 n개를 생성해 반환. 원본 포함."""
+        """대화 기록 반영 + 다양한 관점 변형 쿼리를 단일 LLM 호출로 생성."""
         if n <= 1:
             return [question]
 
-        history_text = ""
-        if history:
-            history_text = "\n".join(
-                f"{'사용자' if msg['role'] == 'user' else 'AI'}: {msg['content'][:200]}"
-                for msg in history
-            ) + "\n\n"
-
-        prompt = (
-            "당신은 기업 내부 문서 검색 전문가입니다.\n"
-            "아래 질문에 대해 벡터 검색 결과를 다양화하기 위한 "
-            f"서로 다른 관점의 검색 쿼리 {n}개를 생성하세요.\n\n"
-            "작성 원칙:\n"
-            "- 각 쿼리는 동일한 정보 니즈를 다른 표현·관점·범위로 나타내야 합니다.\n"
-            "- 상위 개념, 하위 개념, 유사 용어, 절차적 표현 등을 활용하세요.\n"
-            "- 각 쿼리를 새 줄에 하나씩만 출력하세요. 번호나 설명 없이.\n\n"
-            + (f"대화 기록:\n{history_text}" if history_text else "")
-            + f"질문: {question}\n\n"
-            "검색 쿼리들:"
-        )
-        response = self._client.invoke([HumanMessage(content=prompt)])
-        lines = [l.strip().strip('"').strip("'") for l in str(response.content).strip().splitlines()]
-        variants = [l for l in lines if l][:n]
-        # 원본이 포함되지 않은 경우 맨 앞에 추가
-        if question not in variants:
-            variants = [question] + variants[:n - 1]
-        return variants
-
-    def rewrite_query(self, question: str, history: list[dict]) -> str:
-        """Rewrite a follow-up question into a standalone search query using conversation history."""
+        # 히스토리 없으면 LLM 호출 없이 규칙 기반 변형으로 diversity 확보
         if not history:
-            return question
+            return _rule_based_variants(question, n)
 
         history_text = "\n".join(
             f"{'사용자' if msg['role'] == 'user' else 'AI'}: {msg['content'][:200]}"
             for msg in history
         )
-        
-        """프롬프트 관련 내용"""
         prompt = (
             "당신은 기업 내부 문서 검색 전문가입니다.\n"
-            "아래 대화 기록을 참고하여 새로운 질문을 문서 검색에 최적화된 독립적인 쿼리로 재작성하세요.\n\n"
-            "재작성 원칙:\n"
-            "- '그것', '해당', '위의', '앞서' 같은 대명사를 대화 기록에서 찾아 구체적인 용어로 치환하세요.\n"
-            "- 질문의 핵심 키워드와 도메인 용어(규정명, 절차명, 시스템명 등)를 명확히 포함하세요.\n"
-            "- 불필요한 경어나 구어체를 제거하고 명사 중심의 검색 쿼리 형식으로 작성하세요.\n"
-            "- 질문이 이미 독립적이면 그대로 반환하세요.\n"
-            "- 검색 쿼리만 출력하세요. 설명이나 따옴표 없이.\n\n"
+            "아래 대화 기록과 새 질문을 보고 다음 두 가지를 동시에 수행하세요:\n"
+            "1) 대명사('그것', '해당', '위의' 등)를 구체적 용어로 치환해 독립적인 쿼리로 재작성\n"
+            f"2) 벡터 검색 다양화를 위해 서로 다른 표현·관점의 쿼리를 포함해 총 {n}개 생성\n\n"
+            "출력 규칙: 쿼리만 새 줄에 하나씩. 번호나 설명 없이.\n\n"
             f"대화 기록:\n{history_text}\n\n"
-            f"새로운 질문: {question}\n\n"
-            "독립적인 검색 쿼리:"
+            f"새 질문: {question}\n\n"
+            "검색 쿼리들:"
         )
         response = self._client.invoke([HumanMessage(content=prompt)])
-        rewritten = str(response.content).strip().strip('"').strip("'")
-        return rewritten if rewritten else question
+        lines = [l.strip().strip('"').strip("'") for l in str(response.content).strip().splitlines()]
+        variants = [l for l in lines if l][:n]
+        if not variants:
+            return [question]
+        return variants
+
+    def rewrite_query(self, question: str, history: list[dict]) -> str:
+        """generate_query_variants의 첫 번째 결과를 재사용 — 단독 호출 시 호환성 유지."""
+        return self.generate_query_variants(question, history, n=1)[0]
 
     def generate_clarify_options(self, question: str, chunks: list[Source]) -> dict[str, Any]:
         """Analyze question and chunks; return options, direct-answer signal, or a context request.
@@ -211,6 +185,35 @@ class AnswerGenerator:
             + "\n\n".join(context_blocks)
             + "\n\n[답변] 핵심 절차·조건을 명확히 정리하고, 각 내용마다 출처 번호를 표시하세요."
         )
+
+
+def _rule_based_variants(question: str, n: int) -> list[str]:
+    """LLM 없이 한국어 조사 제거 + 키워드 조합으로 검색 쿼리 변형 생성 (0ms)."""
+    import re
+
+    variants: list[str] = [question]
+    if n <= 1:
+        return variants
+
+    # 조사 제거 변형: 명사 + 조사 패턴에서 조사를 벗겨 키워드만 남김
+    particles = r"(?:이|가|은|는|을|를|에서|에게|에|의|로부터|으로|로|과|와|도|만|까지|부터|이나|나|한테|께서)(?=\s|$)"
+    stripped = re.sub(particles, " ", question).strip()
+    stripped = re.sub(r"\s{2,}", " ", stripped)
+    if stripped and stripped != question:
+        variants.append(stripped)
+
+    # 핵심 명사 키워드만 추출: 2글자 이상 한글 단어 중 의문사·조동사 제외
+    stopwords = {"있나요", "있어요", "있어", "알려줘", "알려주세요", "무엇", "뭐야", "뭔가요",
+                 "어떻게", "어떤", "언제", "어디", "누가", "왜", "어느", "어디서", "하나요",
+                 "인가요", "인지", "해줘", "해주세요", "입니까", "입니다", "있습니다", "없나요"}
+    tokens = re.findall(r"[가-힣]{2,}", question)
+    keywords = [t for t in tokens if t not in stopwords]
+    if keywords:
+        keyword_query = " ".join(keywords)
+        if keyword_query != question and keyword_query not in variants:
+            variants.append(keyword_query)
+
+    return variants[:n]
 
 
 def _dedupe_sources(chunks: list[Source]) -> list[dict[str, Any]]:
