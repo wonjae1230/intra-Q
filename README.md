@@ -1,6 +1,8 @@
 # intra-Q
-
-> 사내 문서를 AI가 읽고, 출처를 명시하며 답변하는 기업 내부 문서 RAG 챗봇
+사내 문서를 AI가 읽고, 출처를 명시하며 답변하는 기업 내부 문서 RAG 챗봇
+> ---
+> DevOps 과정 프로젝트 우수상🥈 수상
+ <img width="1063" height="541" alt="image" src="https://github.com/user-attachments/assets/cae9b432-678d-4151-a380-e2e98cb3e089" />
 
 ---
 
