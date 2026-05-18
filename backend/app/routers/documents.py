@@ -31,7 +31,9 @@ from app.schemas.documents import (
     DocumentUploadResponse,
 )
 from app.services.chunk_service import build_page_chunks
+from app.services.page_classifier import classify_page
 from app.services.page_log_service import create_page_log, update_page_log_validation
+from app.services.page_processor import process_page
 from app.services.validation_service import ALLOWED_CATEGORIES, ALLOWED_SEMESTERS, validate_subject
 from rag.pipeline import delete_document_embeddings, embed_chunks
 
@@ -50,7 +52,20 @@ def extract_pdf_pages(pdf_bytes: bytes) -> list[dict[str, Any]]:
     pages: list[dict[str, Any]] = []
     with document:
         for index, page in enumerate(document, start=1):
-            pages.append({"page": index, "text": page.get_text("text").strip()})
+            text = page.get_text("text").strip()
+            try:
+                image_count = len(page.get_images(full=True))
+            except Exception:
+                image_count = 0
+            pages.append(
+                {
+                    "page": index,
+                    "text": text,
+                    "image_count": image_count,
+                    "text_length": len(text),
+                    "line_count": len([line for line in text.splitlines() if line.strip()]),
+                }
+            )
 
     return pages
 
@@ -186,24 +201,41 @@ async def upload_document(
         for page in pages:
             page_number = int(page["page"])
             page_id = build_page_id(curriculum_year, page_number)
+            classification = classify_page(
+                str(page.get("text") or ""),
+                {
+                    "page_number": page_number,
+                    "image_count": page.get("image_count", 0),
+                    "text_length": page.get("text_length", 0),
+                    "line_count": page.get("line_count", 0),
+                },
+            )
+            page_type = classification["page_type"]
+            processing_result = process_page(page_type, page)
             page_log = create_page_log(
                 db,
                 document_id=document_row.id,
                 page_id=page_id,
                 page_number=page_number,
-                page_type="A",
-                process_method="pymupdf",
+                page_type=page_type,
+                process_method=processing_result["method"],
             )
             page_log_count += 1
 
+            processed_page = {
+                **page,
+                "text": processing_result["processed_text"],
+            }
             subject_payloads = extract_subject_payloads_from_page(
-                page,
+                processed_page,
                 page_id=page_id,
                 curriculum_year=curriculum_year,
                 college=college,
                 department=department,
             )
             page_errors: list[str] = []
+            if processing_result.get("failure_reason"):
+                page_errors.append(str(processing_result["failure_reason"]))
 
             for payload in subject_payloads:
                 validation = validate_subject(payload)
@@ -253,9 +285,10 @@ async def upload_document(
                 )
 
             if page_errors:
+                page_status = "manual_required" if processing_result.get("requires_gemini") and len(page_errors) == 1 else "failed"
                 update_page_log_validation(
                     page_log,
-                    validation_status="failed",
+                    validation_status=page_status,
                     failure_reason=" | ".join(page_errors),
                 )
             else:
