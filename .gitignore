@@ -11,3 +11,4 @@ rag/.env
 backend/intra_q.db
 .DS_Store
 repomix-output.xml
+*.pptx
