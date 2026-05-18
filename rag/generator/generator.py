@@ -233,6 +233,15 @@ def _dedupe_sources(chunks: list[Source]) -> list[dict[str, Any]]:
                 "content": chunk.get("content"),
                 "chunk_text": chunk.get("content"),
                 "distance": chunk.get("distance"),
+                # 교과과정 출처 강화 필드
+                "curriculum_year": chunk.get("curriculum_year"),
+                "college": chunk.get("college"),
+                "department": chunk.get("department"),
+                "subject_code": chunk.get("subject_code"),
+                "subject_name": chunk.get("subject_name"),
+                "category": chunk.get("category"),
+                "credit": chunk.get("credit"),
+                "semester": chunk.get("semester"),
             }
         )
     return sources
