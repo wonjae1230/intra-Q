@@ -5,6 +5,8 @@ from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.chunk import Chunk
 from app.models.document import Document
+from app.models.page_log import PageLog
+from app.models.subject import Subject
 from app.models.user import User
 
 
@@ -81,6 +83,11 @@ def init_db() -> None:
     # SQLAlchemy create_all does not alter existing SQLite tables, so add MVP auth
     # ownership columns when an older local database is reused.
     _add_column_if_missing("documents", "user_id", "user_id INTEGER REFERENCES users(id)")
+    _add_column_if_missing("documents", "curriculum_year", "curriculum_year INTEGER")
+    _add_column_if_missing("documents", "college", "college VARCHAR(100)")
+    _add_column_if_missing("documents", "department", "department VARCHAR(100)")
+    _add_column_if_missing("documents", "source_file", "source_file VARCHAR(255)")
+    _add_column_if_missing("documents", "processing_status", "processing_status VARCHAR(30) DEFAULT 'uploaded' NOT NULL")
     _add_column_if_missing("chat_messages", "user_id", "user_id INTEGER REFERENCES users(id)")
     _add_column_if_missing("chat_messages", "session_id", "session_id INTEGER REFERENCES chat_sessions(id)")
     _add_column_if_missing("chat_messages", "sources", "sources TEXT")
