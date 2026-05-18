@@ -23,9 +23,26 @@ def build_chunk_id(chunk: Chunk) -> str:
     return f"{document_id}:{page}:{content_hash}"
 
 
+_METADATA_KEYS = (
+    "document_id",
+    "file_name",
+    "page",
+    # 교과과정 전용 메타데이터
+    "curriculum_year",
+    "college",
+    "department",
+    "subject_code",
+    "subject_name",
+    "category",
+    "credit",
+    "semester",
+    "page_id",
+)
+
+
 def _metadata_from_chunk(chunk: Chunk) -> dict[str, str | int | float | bool]:
     metadata: dict[str, str | int | float | bool] = {}
-    for key in ("document_id", "file_name", "page"):
+    for key in _METADATA_KEYS:
         value = chunk.get(key)
         if isinstance(value, (str, int, float, bool)):
             metadata[key] = value
@@ -121,6 +138,15 @@ class ChromaVectorStore:
                     "page": metadata.get("page"),
                     "document_id": metadata.get("document_id"),
                     "distance": distance,
+                    # 교과과정 전용 필드 (없으면 None)
+                    "curriculum_year": metadata.get("curriculum_year"),
+                    "college": metadata.get("college"),
+                    "department": metadata.get("department"),
+                    "subject_code": metadata.get("subject_code"),
+                    "subject_name": metadata.get("subject_name"),
+                    "category": metadata.get("category"),
+                    "credit": metadata.get("credit"),
+                    "semester": metadata.get("semester"),
                 }
             )
 
