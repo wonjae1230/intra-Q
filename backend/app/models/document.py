@@ -6,6 +6,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+from app.models.chunk import Chunk
 from app.models.page_log import PageLog
 from app.models.subject import Subject
 from app.models.user import User

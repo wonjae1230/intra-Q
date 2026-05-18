@@ -4,6 +4,7 @@ from app.db.session import Base, engine
 from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.chunk import Chunk
+from app.models.curriculum_mapping import CurriculumMapping
 from app.models.document import Document
 from app.models.page_log import PageLog
 from app.models.subject import Subject
