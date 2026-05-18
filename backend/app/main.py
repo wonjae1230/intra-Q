@@ -3,10 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database.init_db import init_db
 from app.routers.auth import router as auth_router
+from app.routers.admin import router as admin_router
 from app.routers.chat import router as chat_router
 from app.routers.chat_history import router as chat_history_router
 from app.routers.curriculum import router as curriculum_router
 from app.routers.documents import router as documents_router
+from app.routers.rag_filters import router as rag_filters_router
 from app.schemas.common import HealthResponse
 from app.utils.logging import configure_logging
 
@@ -52,7 +54,9 @@ def health_check() -> HealthResponse:
 
 
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
 app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
 app.include_router(curriculum_router, prefix="/api/curriculum", tags=["curriculum"])
+app.include_router(rag_filters_router, prefix="/api/rag/filters", tags=["rag-filters"])
 app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 app.include_router(chat_history_router, prefix="/api/chat/history", tags=["chat-history"])
