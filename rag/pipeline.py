@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from rag.config import get_config
+from rag.curriculum.year_extractor import get_curriculum_years
 from rag.embeddings.embedder import OpenAITextEmbedder
 from rag.generator.generator import AnswerGenerator
 from rag.reranker.reranker import VertexAIReranker
@@ -55,8 +56,14 @@ def query(
     document_ids: list[int] | None = None,
     history: list[dict] | None = None,
     approach_hint: str | None = None,
+    curriculum_years: list[int] | None = None,
+    use_year_filter: bool = True,
 ) -> dict[str, Any]:
-    """Answer a question using retrieved chunks and return answer plus sources."""
+    """Answer a question using retrieved chunks and return answer plus sources.
+
+    curriculum_years: 명시적으로 연도 목록 전달 시 우선 사용.
+    use_year_filter: False로 설정 시 연도 필터 비활성화 (RAGAS 비교 평가용).
+    """
 
     if not question or not question.strip():
         raise ValueError("question must not be empty")
@@ -68,6 +75,11 @@ def query(
     final_top_k = top_k or config.top_k
     fetch_k = final_top_k * config.reranker_fetch_multiplier if config.reranker_enabled else final_top_k
 
+    # 연도 필터 결정: 명시 전달 > 질문에서 자동 추출 > 비활성화
+    active_years: list[int] | None = None
+    if use_year_filter:
+        active_years = curriculum_years or get_curriculum_years(question)
+
     # 히스토리가 있으면 rewrite+variants를 단일 LLM 호출로 처리, 없으면 즉시 반환
     query_variants = generator.generate_query_variants(
         question, history or [], n=config.query_variants_count
@@ -75,7 +87,7 @@ def query(
 
     # 각 변형 쿼리로 검색 후 RRF 합산
     result_lists = [
-        retriever.retrieve(q, top_k=fetch_k, document_ids=document_ids)
+        retriever.retrieve(q, top_k=fetch_k, document_ids=document_ids, curriculum_years=active_years)
         for q in query_variants
     ]
     merged = _reciprocal_rank_fusion(result_lists)
@@ -92,6 +104,8 @@ def query(
 def search_with_options(
     question: str,
     document_ids: list[int] | None = None,
+    curriculum_years: list[int] | None = None,
+    use_year_filter: bool = True,
 ) -> dict[str, Any]:
     """Search for relevant chunks, then ask LLM to generate answer approach options."""
 
@@ -102,8 +116,12 @@ def search_with_options(
     retriever = Retriever()
     generator = AnswerGenerator()
 
+    active_years: list[int] | None = None
+    if use_year_filter:
+        active_years = curriculum_years or get_curriculum_years(question)
+
     fetch_k = config.top_k * config.reranker_fetch_multiplier
-    chunks = retriever.retrieve(question, top_k=fetch_k, document_ids=document_ids)
+    chunks = retriever.retrieve(question, top_k=fetch_k, document_ids=document_ids, curriculum_years=active_years)
 
     # Collect unique document_ids from retrieved chunks for the final chat call.
     seen_doc_ids: list[int] = []
