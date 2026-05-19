@@ -346,6 +346,9 @@ async def upload_document(
             "document_id": document_row.id,
             "file_name": document_row.file_name,
             "page": chunk["page_number"],
+            "curriculum_year": document_row.curriculum_year,
+            "college": document_row.college,
+            "department": document_row.department,
         }
         for chunk in chunks
     ]
