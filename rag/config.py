@@ -42,6 +42,8 @@ class RagConfig:
     query_variants_count: int = int(os.getenv("RAG_QUERY_VARIANTS", "3"))
     # HNSW 탐색 후보 수: 기본값 10은 소규모 n_results에서 근사 실패 유발
     chroma_search_ef: int = int(os.getenv("CHROMA_SEARCH_EF", "200"))
+    # 하이브리드 검색 (BM25 + Dense)
+    bm25_enabled: bool = os.getenv("BM25_ENABLED", "true").lower() == "true"
 
 
 def get_config() -> RagConfig:
