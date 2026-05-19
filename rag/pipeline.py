@@ -9,6 +9,7 @@ from rag.curriculum.year_extractor import get_curriculum_years
 from rag.embeddings.embedder import OpenAITextEmbedder
 from rag.generator.generator import AnswerGenerator
 from rag.reranker.reranker import VertexAIReranker
+from rag.retriever.bm25_retriever import BM25Retriever
 from rag.retriever.retriever import Retriever
 from rag.vectorstore.store import ChromaVectorStore
 
@@ -47,6 +48,9 @@ def embed_chunks(chunks: list[Chunk]) -> dict[str, Any]:
     store = ChromaVectorStore()
     embeddings = embedder.embed_texts([chunk["content"] for chunk in chunks])
     ids = store.upsert_chunks(chunks, embeddings)
+    # 새 문서 추가 시 BM25 캐시 무효화
+    from rag.retriever.bm25_retriever import invalidate_cache
+    invalidate_cache()
     return {"stored_count": len(ids), "ids": ids}
 
 
@@ -85,11 +89,19 @@ def query(
         question, history or [], n=config.query_variants_count
     )
 
-    # 각 변형 쿼리로 검색 후 RRF 합산
+    # Dense 검색: 각 변형 쿼리로 검색
     result_lists = [
         retriever.retrieve(q, top_k=fetch_k, document_ids=document_ids, curriculum_years=active_years)
         for q in query_variants
     ]
+
+    # BM25 희소 검색: 원본 질문으로 한 번 검색 후 RRF 목록에 추가
+    if config.bm25_enabled:
+        bm25 = BM25Retriever()
+        bm25_results = bm25.retrieve(question, top_k=fetch_k, curriculum_years=active_years)
+        if bm25_results:
+            result_lists.append(bm25_results)
+
     merged = _reciprocal_rank_fusion(result_lists)
 
     if config.reranker_enabled:
@@ -161,6 +173,9 @@ def delete_document_embeddings(document_id: int) -> dict[str, Any]:
 
     store = ChromaVectorStore()
     deleted_count = store.delete_by_document_id(document_id)
+    # 문서 삭제 시 BM25 캐시 무효화
+    from rag.retriever.bm25_retriever import invalidate_cache
+    invalidate_cache()
     return {"deleted_count": deleted_count}
 
 
