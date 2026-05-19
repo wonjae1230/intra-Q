@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.schemas.chat import ChatData, SourceItem
 from app.services.chat_history_service import list_chat_history, list_session_messages
+from app.services.curriculum_service import extract_admission_year, resolve_curriculum_years
 from rag.pipeline import query as rag_query
 
 
@@ -98,7 +99,21 @@ def generate_chat_response(
             if msg.role in ("user", "assistant")
         ]
 
-    rag_result = rag_query(cleaned_question, top_k=top_k, document_ids=document_ids, history=history, approach_hint=approach_hint)
+    admission_year = extract_admission_year(cleaned_question)
+    curriculum_years = (
+        resolve_curriculum_years(db, admission_year=admission_year)
+        if admission_year is not None and db is not None
+        else None
+    )
+
+    rag_result = rag_query(
+        cleaned_question,
+        top_k=top_k,
+        document_ids=document_ids,
+        history=history,
+        approach_hint=approach_hint,
+        curriculum_years=curriculum_years,
+    )
     answer = str(rag_result.get("answer") or "")
     sources = [_map_source_item(source) for source in rag_result.get("sources", []) if isinstance(source, dict)]
 
