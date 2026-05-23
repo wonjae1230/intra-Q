@@ -70,6 +70,15 @@ def extract_pdf_pages(pdf_bytes: bytes) -> list[dict[str, Any]]:
     return pages
 
 
+def _extract_year_from_filename(filename: str) -> int | None:
+    """파일명에서 교과과정 연도(2020~2030) 자동 추출."""
+    for match in re.findall(r"20[2-3]\d", filename):
+        year = int(match)
+        if 2020 <= year <= 2030:
+            return year
+    return None
+
+
 def build_page_id(curriculum_year: int | None, page_number: int) -> str:
     """Build a stable page identifier for curriculum processing logs."""
     year_prefix = str(curriculum_year) if curriculum_year else "unknown"
@@ -161,6 +170,9 @@ async def upload_document(
         pages = extract_pdf_pages(pdf_bytes)
         chunks = build_page_chunks(pages)
         source_file = file.filename or "unknown.pdf"
+
+        if curriculum_year is None:
+            curriculum_year = _extract_year_from_filename(source_file)
 
         # Persist the document first so chunk rows can reference its id.
         document_row = Document(
