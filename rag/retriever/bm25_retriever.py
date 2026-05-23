@@ -121,6 +121,9 @@ class BM25Retriever:
             for doc, meta in zip(raw["documents"], raw["metadatas"])
         ]
 
+        if not chunks:
+            return [], None
+
         tokenized = [_tokenize(c["content"]) for c in chunks]
         bm25 = BM25Okapi(tokenized)
         _index_cache[key] = (chunks, bm25)
