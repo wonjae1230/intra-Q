@@ -58,7 +58,7 @@ def _resolve_user_document_ids(db: Session, user_id: int, requested_ids: list[in
         .all()
     }
 
-    if requested_ids is None:
+    if not requested_ids:
         return sorted(owned_ids)
 
     requested_set = set(requested_ids)

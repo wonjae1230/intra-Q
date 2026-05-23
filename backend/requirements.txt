@@ -15,3 +15,5 @@ langchain-community
 langchain-chroma
 chromadb
 openai>=1.0.0,<2.0.0
+rank-bm25
+kiwipiepy
